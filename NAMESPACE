@@ -1,0 +1,33 @@
+# Copyright 2012 Google Inc. All Rights Reserved.
+# Author: stevescott@google.com (Steve Scott)
+
+import(Boom)
+
+export(lm.spike,
+       PlotModelSize,
+       plot.lm.spike,
+       SummarizeSpikeSlabCoefficients,
+       summary.lm.spike,
+       print.summary.lm.spike,
+       predict.lm.spike,
+       logit.spike,
+       mlm.spike,
+       MultinomialLogitSpikeSlabPrior,
+       SpikeSlabPrior,
+       IndependentSpikeSlabPrior,
+       SpikeSlabPriorBase)
+
+S3method(plot, lm.spike)
+S3method(predict, lm.spike)
+S3method(summary, lm.spike)
+
+S3method(print, summary.lm.spike)
+
+S3method(predict, logit.spike)
+S3method(summary, logit.spike)
+
+S3method(print, summary.logit.spike)
+useDynLib(BoomSpikeSlab,
+          do_spike_slab,
+          logit_spike_slab_wrapper,
+          multinomial_logit_spike_slab)
