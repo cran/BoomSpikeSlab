@@ -7,6 +7,10 @@
 #include "cpputil/Ptr.hpp"
 #include "r_interface/print_R_timestamp.hpp"
 #include "r_interface/handle_exception.hpp"
+#include "r_interface/seed_rng_from_R.hpp"
+#include "r_interface/prior_specification.hpp"
+#include "r_interface/list_io.hpp"
+#include "r_interface/boom_r_tools.hpp"
 
 #include "Models/Glm/BinomialLogitModel.hpp"
 #include "Models/Glm/PosteriorSamplers/BinomialLogitCompositeSpikeSlabSampler.hpp"
@@ -24,18 +28,16 @@ namespace {
 // Set the coefficients equal to their initial values, and determine
 // which coefficients are initially excluded (i.e. forced to zero).
 // Args:
-//   beta0:  C array containing initial coefficients.
-//   number_of_coefficients:  Length of beta0.
+//   initial_beta:  Vector containing initial coefficients.
 //   prior_inclusion_probabilities: Prior probabilities that each
 //     coefficient is nonzero.
 //   model:  The model that owns the coefficients.
 //   sampler:  The sampler that will make posterior draws for the model.
 inline void InitializeCoefficients(
-    const double *beta0, int number_of_coefficients,
-    const BOOM::Vec & prior_inclusion_probabilities,
+    const BOOM::Vector &initial_beta,
+    const BOOM::Vector &prior_inclusion_probabilities,
     BOOM::Ptr<BOOM::BinomialLogitModel> model,
     BOOM::Ptr<BOOM::BinomialLogitCompositeSpikeSlabSampler> sampler) {
-  BOOM::Vec initial_beta(beta0, beta0 + number_of_coefficients);
   model->set_Beta(initial_beta);
   if (min(prior_inclusion_probabilities) >= 1.0) {
     // Ensure all coefficients are included if you're not going to
@@ -47,8 +49,8 @@ inline void InitializeCoefficients(
     // excluded from the model.  Large ones start off included.
     // Adding or dropping is idempotent, so no need to worry about
     // dropping an already excluded coefficient.
-    for (int i = 0; i < number_of_coefficients; ++i) {
-      if (fabs(beta0[i]) < 1e-8) {
+    for (int i = 0; i < initial_beta.size(); ++i) {
+      if (fabs(initial_beta[i]) < 1e-8) {
         model->coef().drop(i);
       } else {
         model->coef().add(i);
@@ -60,100 +62,100 @@ inline void InitializeCoefficients(
 }  // unnamed namespace
 
 extern "C" {
-  using BOOM::Spd;
-  using BOOM::Mat;
-  using BOOM::Vec;
+  using BOOM::SpdMatrix;
+  using BOOM::Matrix;
+  using BOOM::Vector;
   using BOOM::ConstVectorView;
   using BOOM::VectorView;
   using BOOM::MvnModel;
   using BOOM::VariableSelectionPrior;
-  using BOOM::BinomialLogitModel;
-  using BOOM::BinomialRegressionData;
-  using BOOM::BinomialLogitSpikeSlabSampler;
-  using BOOM::BinomialLogitCompositeSpikeSlabSampler;
   using BOOM::Ptr;
 
   // This function is a wrapper for spike and slab regression.  It
   // takes input from R and formats it for the appropriate BOOM
   // objects that handle the comptuations.
-  void logit_spike_slab_wrapper(
-      const double *x,              // design matrix
-      const int *y,                 // vector of success counts
-      const int *ny,                // vector of trial counts
-      const double *mu,             // prior mean vector
-      const double *sigma_inverse,  // prior precision matrix
-      const double *pi,             // prior inclusion probabilities
-      const int *max_flips,         // max number of indicators to sample
-      const int *n,                 // length of y, nrow(x)
-      const int *p,                 // ncol(x), ncol(ans)
-      const int *niter,             // number of mcmc iterations
-      const int *ping,              // frequency of desired status updates
-      const int *nthreads,          // number of imputation threads
-      const double *beta0,          // initial value in the MCMC simulation
-      const int *clt_threshold,     // see comments in ../R/logit.spike.R
-      const int *mh_chunk_size,     // see comments in ../R/logit.spike.R
-      const int *seed,
-      double *beta_draws            // output:  mcmc draws of beta
-                                ) {
+  SEXP logit_spike_slab_wrapper(
+      SEXP r_x,              // design matrix
+      SEXP r_y,              // vector of success counts
+      SEXP r_ny,             // vector of trial counts
+      SEXP r_prior,          // SpikeSlabPrior
+      SEXP r_niter,          // number of mcmc iterations
+      SEXP r_ping,           // frequency of desired status updates
+      SEXP r_nthreads,       // number of imputation threads
+      SEXP r_beta0,          // initial value in the MCMC simulation
+      SEXP r_clt_threshold,  // see comments in ../R/logit.spike.R
+      SEXP r_mh_chunk_size,  // see comments in ../R/logit.spike.R
+      SEXP r_seed)  {
     try {
-      BOOM::GlobalRng::rng.seed(*seed);
-      Ptr<BinomialLogitModel>  model(new BinomialLogitModel(*p));
-      for (int i = 0; i < *n; ++i) {
-        ConstVectorView xi(x+i, *p, *n);
-        Ptr<BinomialRegressionData>
-            dp(new BinomialRegressionData(y[i], ny[i], xi));
+      BOOM::RInterface::seed_rng_from_R(r_seed);
+      Matrix design_matrix(BOOM::ToBoomMatrix(r_x));
+      std::vector<int> successes(BOOM::ToIntVector(r_y));
+      std::vector<int> trials(BOOM::ToIntVector(r_ny));
+      Ptr<BOOM::BinomialLogitModel> model(new BOOM::BinomialLogitModel(
+          design_matrix.ncol()));
+      int number_of_observations = successes.size();
+      for (int i = 0; i < number_of_observations; ++i) {
+        Ptr<BOOM::BinomialRegressionData>
+            dp(new BOOM::BinomialRegressionData(
+                successes[i],
+                trials[i],
+                design_matrix.row(i)));
         model->add_data(dp);
       }
 
-      // Copy data to BOOM structures in preparation for building the
-      // model
-      Vec Mu(mu, mu + (*p));
-      Spd Siginv(Mat(sigma_inverse,
-                     sigma_inverse + (*p)*(*p),
-                     *p,
-                     *p));
-      Vec prior_inclusion_probabilities(pi, pi + (*p));
-
-      Ptr<MvnModel> beta_prior(new MvnModel(Mu, Siginv, true));
-      Ptr<VariableSelectionPrior> inclusion_prior(
-          new VariableSelectionPrior(
-              prior_inclusion_probabilities));
+      BOOM::RInterface::SpikeSlabGlmPrior prior(r_prior);
 
       double proposal_degrees_of_freedom = 3;
-      int max_chunk_size = *mh_chunk_size;
+      int max_tim_chunk_size = Rf_asInteger(r_mh_chunk_size);
+      int max_rwm_chunk_size = 1;
+      double rwm_variance_scale_factor = .025;
       Ptr<BOOM::BinomialLogitCompositeSpikeSlabSampler> sampler(
-          new BinomialLogitCompositeSpikeSlabSampler(
+          new BOOM::BinomialLogitCompositeSpikeSlabSampler(
               model.get(),
-              beta_prior,
-              inclusion_prior,
-              *clt_threshold,
+              prior.slab(),
+              prior.spike(),
+              Rf_asInteger(r_clt_threshold),
               proposal_degrees_of_freedom,
-              max_chunk_size));
-      if (*nthreads > 1) {
-        // TODO(stevescott): Add threading support back into
-        // BOOM::BinomialLogitSpikeSlabSampler.
+              max_tim_chunk_size,
+              max_rwm_chunk_size,
+              rwm_variance_scale_factor));
+      int nthreads = Rf_asInteger(r_nthreads);
+      if (nthreads > 1) {
+        sampler->set_number_of_workers(nthreads);
       }
-      sampler->limit_model_selection(*max_flips);
 
-      InitializeCoefficients(beta0, *p, prior_inclusion_probabilities,
-                             model, sampler);
+      if (prior.max_flips() > 0) {
+        sampler->limit_model_selection(prior.max_flips());
+      }
 
-      for (int i = 0; i < *niter; ++i) {
-        // TODO(stevescott): Find a way to allow user interrupts that
-        // ensures smart-pointer protected resources are freed.
+      InitializeCoefficients(BOOM::ToBoomVector(r_beta0),
+                             prior.prior_inclusion_probabilities(),
+                             model,
+                             sampler);
+
+      int niter = Rf_asInteger(r_niter);
+      BOOM::RListIoManager io_manager;
+      io_manager.add_list_element(
+          new BOOM::GlmCoefsListElement(
+              model->coef_prm(),
+              "beta"));
+      SEXP ans;
+      PROTECT(ans = io_manager.prepare_to_write(niter));
+      int ping = Rf_asInteger(r_ping);
+
+      for (int i = 0; i < niter; ++i) {
         R_CheckUserInterrupt();
-        BOOM::print_R_timestamp(i, *ping);
+        BOOM::print_R_timestamp(i, ping);
         sampler->draw();
-        // Copy the draw to row i of the matrix beta_draws.
-        // beta_view refers to row i of beta_draws.
-        // It has length *p, with stride *niter.
-        VectorView beta_view(beta_draws + i, *p, *niter);
-        beta_view = model->Beta();
+        io_manager.write();
       }
+      UNPROTECT(1);
+      return ans;
     } catch(std::exception &e) {
       BOOM::RInterface::handle_exception(e);
     } catch(...) {
       BOOM::RInterface::handle_unknown_exception();
     }
+    return R_NilValue;
   }
 }

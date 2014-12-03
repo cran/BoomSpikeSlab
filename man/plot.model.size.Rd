@@ -13,15 +13,15 @@
 }
 
 \usage{
-  PlotModelSize(model, burn = 0, xlab= "Number of nonzero coefficients", ...)
+  PlotModelSize(beta, burn = 0, xlab= "Number of nonzero coefficients", ...)
 }
 \arguments{
-  \item{model}{
-    An object of class \code{lm.spike}.
-  }
 
-  \item{burn}{ The number of MCMC iterations to be discarded as burn-in.
-    }
+  \item{beta}{ A matrix of model coefficients.  Each row represents an
+    MCMC draw.  Each column represents a coefficient for a variable.  }
+
+  \item{burn}{ The number of MCMC iterations to be discarded as
+    burn-in.}
 
   \item{xlab}{ Label for the horizontal axis.}
 
@@ -52,7 +52,12 @@ simulate.lm.spike <- function(n = 100, p = 10, ngood = 3, niter=1000, sigma = 8)
   return(invisible(draws))
 }
 model <- simulate.lm.spike(n = 1000, p = 50, sigma = .3)
-PlotModelSize(model, burn = 10)
+
+# To get the plot of model size directly.
+PlotModelSize(model$beta, burn = 10)
+
+# Another way to get the same plot.
+plot(model, "size", burn = 10)
 }
 \keyword{models}
 \keyword{regression}

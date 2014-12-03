@@ -84,20 +84,8 @@ namespace {
     }
 
     // ------------- Create and set the prior and the posterior sampler. -----
-    Vector prior_inclusion_probabilities(ToBoomVector(getListElement(
-        r_multinomial_logit_spike_slab_prior,
-        "prior.inclusion.probabilities")));
-    Vector prior_mean(ToBoomVector(getListElement(
-        r_multinomial_logit_spike_slab_prior,
-        "mu")));
-    Vector prior_variance_diagonal(ToBoomVector(getListElement(
-        r_multinomial_logit_spike_slab_prior,
-        "prior.variance.diagonal")));
-    NEW(IndependentMvnModel, slab)(prior_mean,
-                                   prior_variance_diagonal);
-
-    NEW(VariableSelectionPrior, spike)(prior_inclusion_probabilities);
-
+    BOOM::RInterface::SpikeSlabGlmPrior prior(
+        r_multinomial_logit_spike_slab_prior);
     double proposal_degrees_of_freedom = Rf_asReal(r_proposal_df);
     double rwm_variance_scale_factor = Rf_asReal(r_rwm_scale_factor);
     int nthreads = Rf_asInteger(r_nthreads);
@@ -105,8 +93,8 @@ namespace {
 
     NEW(MultinomialLogitCompositeSpikeSlabSampler, sampler)(
         model.get(),
-        slab,
-        spike,
+        prior.slab(),
+        prior.spike(),
         proposal_degrees_of_freedom,
         rwm_variance_scale_factor,
         nthreads,
@@ -115,12 +103,7 @@ namespace {
     sampler->set_move_probabilities(proposal_weights[0],
                                     proposal_weights[1],
                                     proposal_weights[2]);
-    int max_flips = -1;
-    SEXP r_max_flips = getListElement(
-        r_multinomial_logit_spike_slab_prior, "max.flips");
-    if (!Rf_isNull(r_max_flips)) {
-      max_flips = Rf_asInteger(r_max_flips);
-    }
+    int max_flips = prior.max_flips();
     if (max_flips > 0) {
       sampler->limit_model_selection(max_flips);
     }

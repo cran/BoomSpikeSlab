@@ -21,7 +21,10 @@ lm.spike(formula,
          prior = NULL,
          contrasts = NULL,
          drop.unused.levels = TRUE,
-         method = c("SSVS", "DA"),
+         bma.method = c("SSVS", "ODA"),
+         oda.options = list(
+             fallback.probability = 0.0,
+             eigenvalue.fudge.factor = 0.01),
          ping = niter / 10,
          seed = NULL,
          ...)
@@ -58,9 +61,29 @@ lm.spike(formula,
   \item{drop.unused.levels}{Logical indicating whether unobserved factor
     levels should be dropped from the model.}
 
-  \item{method}{The MCMC method to use.  SSVS is the stochastic search
-    variable selection algorithm from George and McCulloch (1998).  DA
-    is the data augmentation method from Clyde and Ghosh (2011).}
+  \item{bma.method}{ The MCMC method to use.  SSVS is the stochastic
+    search variable selection algorithm from George and McCulloch
+    (1998).  ODA is the orthogonal data augmentation method from Clyde
+    and Ghosh (2011).  }
+
+
+  \item{oda.options}{If bma.method == "ODA" then these are some options
+    for fine tuning the ODA algorithm.
+    \itemize{
+
+      \item \code{fallback.probability}: Each MCMC iteration will use
+      SSVS instead of ODA with this probability.  In cases where
+      the latent data have high leverage, ODA mixing can suffer.
+      Mixing in a few SSVS steps can help keep an errant algorithm
+      on track.
+
+      \item \code{eigenvalue.fudge.factor}: The latent X's will be
+      chosen so that the complete data X'X matrix (after scaling) is a
+      constant diagonal matrix equal to the largest eigenvalue of the
+      observed (scaled) X'X times (1 + eigenvalue.fudge.factor).  This
+      should be a small positive number.
+    }
+  }
 
   \item{ping}{The frequency with which to print status update messages
     to the screen.  For example, if \code{ping == 10} then an update

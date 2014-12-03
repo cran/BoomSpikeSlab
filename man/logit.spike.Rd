@@ -13,13 +13,20 @@
   subset of the regression coefficients.
 }
 \usage{
-logit.spike(formula, niter, data, subset, prior = NULL,
+logit.spike(formula,
+            niter,
+            data,
+            subset,
+            prior = NULL,
             na.action = options("na.action"),
             contrasts = NULL,
             drop.unused.levels = TRUE,
-            initial.value = NULL, ping = niter / 10, nthreads = 4,
+            initial.value = NULL,
+            ping = niter / 10,
+            nthreads = 0,
             clt.threshold = 2,
-            mh.chunk.size = 10, proposal.df = 3,
+            mh.chunk.size = 10,
+            proposal.df = 3,
             seed = NULL,
             ...)
 }
@@ -35,12 +42,6 @@ logit.spike(formula, niter, data, subset, prior = NULL,
 
   \item{niter}{ The number of MCMC iterations to run.  Be sure to
     include enough so you can throw away a burn-in set.  }
-
-  \item{ping}{If positive, then print a status update to the console
-    every \code{ping} MCMC iterations.}
-
-  \item{nthreads}{The number of CPU-threads to use for data
-    augmentation.}
 
   \item{data}{ An optional data frame, list or environment (or object
     coercible by 'as.data.frame' to a data frame) containing the
@@ -78,6 +79,16 @@ logit.spike(formula, niter, data, subset, prior = NULL,
     are desired.  If a \code{\link{glm}} object is supplied then its
     coefficients will be used as the initial values for the simulation.
     }
+
+  \item{ping}{If positive, then print a status update to the console
+    every \code{ping} MCMC iterations.}
+
+  \item{nthreads}{The number of CPU-threads to use for data
+    augmentation.  There is some small overhead to stopping and starting
+    threads.  For small data sets, thread overhead will make it faster
+    to run single threaded.  For larger data sets multi-threading can
+    speed things up substantially.  This is all machine dependent, so
+    please experiment.}
 
   \item{clt.threshold}{When the model is presented with binomial data
     (i.e. when the response is a two-column matrix) the data
@@ -160,9 +171,11 @@ logit.spike(formula, niter, data, subset, prior = NULL,
 \seealso{
   \code{\link{lm.spike}}
   \code{\link{SpikeSlabPrior}},
-  \code{\link{plot.lm.spike}},
-  \code{\link{summary.lm.spike}},
-  \code{\link{predict.lm.spike}}.
+  \code{\link{plot.logit.spike}},
+  \code{\link{PlotLogitSpikeFitSummary}}
+  \code{\link{PlotLogitSpikeResiduals}}
+  \code{\link{summary.logit.spike}},
+  \code{\link{predict.logit.spike}}.
 }
 
 \examples{
@@ -179,6 +192,8 @@ simulate.logit.spike <- function(n = 100, p = 10, ngood = 3,
 }
 model <- simulate.logit.spike()
 plot(model)
+plot(model, "fit")
+plot(model, "residuals")
 summary(model)
 }
 \keyword{models}

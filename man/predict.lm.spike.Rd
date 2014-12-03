@@ -5,6 +5,7 @@
 \Rdversion{1.1}
 \alias{predict.lm.spike}
 \alias{predict.logit.spike}
+\alias{predict.poisson.spike}
 \title{
   Predictions using spike-and-slab regression.
 }
@@ -14,11 +15,18 @@
 }
 
 \usage{
-  \method{predict}{lm.spike}(object, newdata, burn = 0, na.action = na.pass, ...)
-  \method{predict}{logit.spike}(object, newdata, burn = 0,
-                      type = c("prob", "logit", "link", "response"),
-                      na.action = na.pass, ...)
+\method{predict}{lm.spike}(object, newdata, burn = 0,
+    na.action = na.pass, ...)
+
+\method{predict}{logit.spike}(object, newdata, burn = 0,
+    type = c("prob", "logit", "link", "response"),
+    na.action = na.pass, ...)
+
+\method{predict}{poisson.spike}(object, newdata, burn = 0,
+    type = c("mean", "log", "link", "response"),
+    na.action = na.pass, ...)
 }
+
 \arguments{
   \item{object}{
     An object of class \code{lm.spike}.
@@ -46,10 +54,17 @@
     is \code{\link{na.omit}}.  Another possible value is \code{NULL}, no
     action.  Value \code{\link{na.exclude}} can be useful.}
 
-  \item{type}{ The type of prediction desired.  If \code{prob} then the
-    prediction is returned on the probability scale.  If \code{logit}
-    then it is returned on the logit scale (i.e. the scale of the linear
-    predictor).  Also accepts \code{link} and \code{response} for
+  \item{type}{ The type of prediction desired.
+
+    For \code{logit.spike}, \code{prob} means the prediction is returned
+    on the probability scale, while \code{logit} returns the scale of
+    the linear predictor.
+
+    For \code{poisson.spike}, \code{mean} means the prediction is
+    returned on the scale of the data, while \code{log} means it is on
+    the scale of the linear predictor.
+
+    Both cases also accept \code{link} and \code{response} for
     compatibility with \code{predict.glm}.  }
 
   \item{\dots}{Unused, but present for compatibility with generic \code{predict()}.}

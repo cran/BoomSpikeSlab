@@ -22,7 +22,8 @@ SpikeSlabPrior(x,
                max.flips = -1,
                mean.y = mean(y, na.rm = TRUE),
                sdy = sd(as.numeric(y), na.rm = TRUE),
-               prior.inclusion.probabilities = NULL)
+               prior.inclusion.probabilities = NULL,
+               sigma.upper.limit = Inf)
 
 }
 \arguments{
@@ -91,6 +92,10 @@ SpikeSlabPrior(x,
 
   \item{prior.inclusion.probabilities}{A vector giving the prior
     probability of inclusion for each variable.}
+
+  \item{sigma.upper.limit}{The largest acceptable value for the residual
+    standard deviation.  A non-positive number is interpreted as
+    \code{Inf}.}
 }
 
 \value{

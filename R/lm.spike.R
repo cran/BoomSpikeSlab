@@ -1,6 +1,3 @@
-# Copyright 2010 Google Inc. All Rights Reserved.
-# Author: stevescott@google.com (Steve Scott)
-
 lm.spike <- function(formula,
                      niter,
                      data,
@@ -8,7 +5,10 @@ lm.spike <- function(formula,
                      prior = NULL,
                      contrasts = NULL,
                      drop.unused.levels = TRUE,
-                     method = c("SSVS", "DA"),
+                     bma.method = c("SSVS", "ODA"),
+                     oda.options = list(
+                         fallback.probability = 0.0,
+                         eigenvalue.fudge.factor = 0.01),
                      ping = niter / 10,
                      seed = NULL,
                      ...) {
@@ -24,16 +24,37 @@ lm.spike <- function(formula,
   ##   subset: An optional vector specifying a subset of observations
   ##     to be used in the fitting process.
   ##   prior: An object of class SpikeSlabPrior or
-  ##     IndependentSpikeSlabPrior.  If missing, SpikeSlabPrior will
-  ##     be called with the arguments passed as ....
+  ##     IndependentSpikeSlabPrior.  If missing, a default prior will
+  ##     be generated using the arguments passed as ... .  If
+  ##     'bma.method' is SSVS then either a SpikeSlabPrior or
+  ##     IndependentSpikeSlabPrior can be used.  (A SpikeSlabPrior will
+  ##     be used as the default).  If 'bma.method' is ODA then an
+  ##     IndependentSpikeSlabPrior is required.
   ##   contrasts: An optional list. See the 'contrasts.arg' of
   ##     ‘model.matrix.default’.
   ##   drop.unused.levels: logical.  Should unobserved factor levels
   ##     be dropped from the model?
-  ##   method: The MCMC method to use for posterior sampling.  SSVS is
-  ##     the original "stochastic search variable selection" from
-  ##     George and McCulloch 1998.  DA is the method from Clyde and
-  ##     Ghosh (2011).
+  ##   bma.method: The method to use for Bayesian model averaging.
+  ##     "SSVS" is stochastic search variable selection, which is the
+  ##     classic approach from George and McCulloch (1997).  "ODA" is
+  ##     orthoganal data augmentation, from Ghosh and Clyde (2011).
+  ##     It adds a set of latent observations that make the X'X matrix
+  ##     diagonal, simplifying complete data MCMC for model selection.
+  ##     ODA is likely to be faster than SSVS, but it is a newer
+  ##     method and not quite as battle tested.
+  ##   oda.options: A list (which is ignored unless bma.method ==
+  ##     "ODA") with the following elements:
+  ##     * fallback.probability: Each MCMC iteration will use SSVS
+  ##         instead of ODA with this probability.  In cases where the
+  ##         latent data have high leverage, ODA mixing can suffer.
+  ##         Mixing in a few SSVS steps can help keep an errant
+  ##         algorithm on track.
+  ##     * eigenvalue.fudge.factor: The latent X's will be chosen so
+  ##         that the complete data X'X matrix (after scaling) is a
+  ##         constant diagonal matrix equal to the largest eigenvalue
+  ##         of the observed (scaled) X'X times (1 +
+  ##         eigenvalue.fudge.factor).  This should be a small
+  ##         positive number.
   ##   ping: Write a status update to the console every 'ping'
   ##     iterations.
   ##   seed:  An integer to use for the C++ seed.
@@ -64,15 +85,21 @@ lm.spike <- function(formula,
   y <- model.response(mf, "numeric")
 
   x <- model.matrix(mt, mf, contrasts)
-  method <- match.arg(method)
+  bma.method <- match.arg(bma.method)
   if (is.null(prior)) {
-    if (method == "SSVS") {
+    if (bma.method == "SSVS") {
       prior <- SpikeSlabPrior(x, y, ...)
-    } else if (method == "DA") {
+    } else if (bma.method == "ODA") {
       prior <- IndependentSpikeSlabPrior(x, y, ...)
     }
   }
   stopifnot(inherits(prior, "SpikeSlabPriorBase"))
+  if (bma.method == "ODA") {
+    stopifnot(inherits(prior, "IndependentSpikeSlabPrior"))
+    stopifnot(is.list(oda.options))
+    check.scalar.probability(oda.options$fallback.probability)
+    check.positive.scalar(oda.options$eigenvalue.fudge.factor)
+  }
 
   stopifnot(is.numeric(ping))
   stopifnot(length(ping) == 1)
@@ -81,7 +108,30 @@ lm.spike <- function(formula,
     seed <- as.integer(seed)
   }
 
-  ans <- .lm.spike.fit(x, y, prior, as.integer(niter), as.integer(ping), seed)
+  stopifnot(nrow(x) == length(y))
+  stopifnot(length(prior$mu) == ncol(x))
+  stopifnot(length(prior$prior.inclusion.probabilities) == ncol(x))
+
+  ## The following is for backward compatibility.  A max.flips
+  ## argument was added to SpikeSlabPrior.
+  if (is.null(prior$max.flips)) {
+    prior$max.flips <- -1
+  }
+
+  ans <- .Call(do_spike_slab,
+               x,
+               y,
+               prior,
+               as.integer(niter),
+               as.integer(ping),
+               bma.method,
+               oda.options,
+               seed)
+  variable.names <- dimnames(x)[[2]]
+  if (!is.null(variable.names)) {
+    colnames(ans$beta) <- variable.names
+  }
+  ans$prior <- prior
 
   ## The stuff below will be needed by predict.lm.spike.
   ans$contrasts <- attr(x, "contrasts")
@@ -90,26 +140,43 @@ lm.spike <- function(formula,
   ans$terms <- mt
   ans$sample.sd <- sd(y)
 
-  ## Make the answer a class, so that the right methods will be used.
   class(ans) <- "lm.spike"
   return(ans)
 }
 
-plot.lm.spike <- function(x,
-                          burn = 0,
-                          inclusion.threshold = 0,
-                          unit.scale = TRUE,
-                          number.of.variables = NULL,
-                          ...) {
-  ## S3 plotting method for lm.spike objects.  Produces a barplot of the
-  ## marginal inclusion probabilities of each variable, sorted by the
-  ## marginal inclusion probability, and shaded by the conditional
-  ## probability that a coefficient is positive, given that it is
-  ## nonzero.
+##----------------------------------------------------------------------
+plot.lm.spike <- function(
+    x,
+    y = c("coefficients", "size"),
+    ...) {
+  ## S3 method for plotting lm.spike objects.
+  y <- match.arg(y)
+  if (y == "coefficients") {
+    return(PlotMarginalInclusionProbabilities(x$beta, ...))
+  } else if (y == "size") {
+    return(PlotModelSize(x$beta, ...))
+  } else {
+    stop("unknown option", y, " in plot.lm.spike")
+  }
+}
+
+PlotMarginalInclusionProbabilities <- function(
+    beta,
+    burn = 0,
+    inclusion.threshold = 0,
+    unit.scale = TRUE,
+    number.of.variables = NULL,
+    ...) {
+  ## Produces a barplot of the marginal inclusion probabilities for a
+  ## set of model coefficients sampled under a spike and slab prior.
+  ## The coefficients are sorted by the marginal inclusion
+  ## probability, and shaded by the conditional probability that a
+  ## coefficient is positive, given that it is nonzero.
   ##
   ## Args:
-  ##   x: An object of class 'lm.spike' produced by the 'lm.spike'
-  ##     function.
+  ##   beta: A matrix of model coefficients.  Each row represents an
+  ##     MCMC draw.  Each column represents a coefficient for a
+  ##     variable.
   ##   burn: Number of MCMC iterations to discard.  If burn <= 0 then
   ##     no iterations are discarded.
   ##   inclusion.threshold: Only plot coefficients with posterior
@@ -133,8 +200,8 @@ plot.lm.spike <- function(x,
   ##     in the same order as positive.prob and inclusion.prob.  That
   ##     is: beta[, permutation] will have the most significant
   ##     coefficients in the right hand columns.
-
-  beta <- x$beta
+  stopifnot(is.matrix(beta))
+  stopifnot(nrow(beta) > burn)
   if (burn > 0) {
     beta <- beta[-(1:burn), , drop = FALSE]
   }
@@ -199,20 +266,25 @@ plot.lm.spike <- function(x,
   return(invisible(ans))
 }
 
-PlotModelSize <- function(model, burn = 0,
-                            xlab = "Number of nonzero coefficients", ...) {
+##----------------------------------------------------------------------
+PlotModelSize <- function(
+    beta,
+    burn = 0,
+    xlab = "Number of nonzero coefficients",
+    ...) {
   ## Plot a histogram of the number of nonzero coefficient in the model.
   ## Args:
-  ##   model: A model object produced by lm.spike.
+  ##   beta: A matrix of model coefficients.  Each row represents an
+  ##     MCMC draw.  Each column represents a coefficient for a
+  ##     variable.
   ##   burn:  The number of MCMC iterations to discard as burn-in.
   ##   xlab:  Label for the x axis.
   ##   ...:   Extra arguments to be passed to 'hist'.
   ## Returns:
   ##   A vector giving the number of nonzero coefficients in each MCMC
   ##     iteration.
-
-  stopifnot(inherits(model, "lm.spike"))
-  beta <- model$beta
+  stopifnot(is.matrix(beta))
+  stopifnot(nrow(beta) > burn)
   if (burn > 0) {
     beta <- beta[-(1:burn), , drop = FALSE]
   }
@@ -221,6 +293,7 @@ PlotModelSize <- function(model, burn = 0,
   return(invisible(size))
 }
 
+##----------------------------------------------------------------------
 SummarizeSpikeSlabCoefficients <- function(beta, burn = 0, order = TRUE) {
   ## Compute posterior means, posterior standard deviations, and
   ## posterior inclusion probabilities for the coefficients in the
@@ -273,6 +346,7 @@ SummarizeSpikeSlabCoefficients <- function(beta, burn = 0, order = TRUE) {
   return(coef)
 }
 
+##----------------------------------------------------------------------
 summary.lm.spike <- function(object, burn = 0, order = TRUE, ...) {
   ## Summarize the coefficients and residual standard deviation from
   ## an lm.spike object.
@@ -306,6 +380,7 @@ summary.lm.spike <- function(object, burn = 0, order = TRUE, ...) {
   return(ans)
 }
 
+##----------------------------------------------------------------------
 print.summary.lm.spike <- function(x, ...) {
   ## Print method for summary.lm.spike objects.  Only print 3
   ## significant digits.
@@ -318,6 +393,7 @@ print.summary.lm.spike <- function(x, ...) {
   cat("\n")
 }
 
+##----------------------------------------------------------------------
 predict.lm.spike <- function(object, newdata, burn = 0,
                              na.action = na.pass, ...) {
   ## Prediction method for lm.spike
@@ -360,11 +436,11 @@ predict.lm.spike <- function(object, newdata, burn = 0,
         warning("Implicit intercept added to newdata.")
       }
     }
-  } else if (is.vector(newdata) & beta.dimension == 2) {
+  } else if (is.vector(newdata) && beta.dimension == 2) {
     if (attributes(object$terms)$intercept) {
       X <- cbind(1, newdata)
     }
-  } else if (is.vector(newdata & beta.dimension == 1)) {
+  } else if (is.vector(newdata) && beta.dimension == 1) {
     X <- matrix(newdata, ncol=1)
   } else {
     stop("Error in predict.lm.spike:  newdata must be a matrix,",
@@ -392,41 +468,4 @@ predict.lm.spike <- function(object, newdata, burn = 0,
                         rep(sigma, each = nrow(X))),
                   nrow = nrow(X))
   return(y.new)
-}
-
-.lm.spike.fit <- function(x, y, prior, niter, ping, seed) {
-  ## Driver function for lm.spike.
-  ## Args:
-  ##   x: design matrix with 'n' rows corresponding to observations and
-  ##     'p' columns corresponding to predictor variables.
-  ##   y: vector of responses of length n
-  ##   prior: a list structured like the return value from SpikeSlabPrior.
-  ##   niter:  the number of desired MCMC iterations
-  ## Returns:
-  ##   An object of class lm.spike, which is a list with the elements
-  ##   described in the 'lm.spike' function.
-  stopifnot(nrow(x) == length(y))
-  stopifnot(length(prior$mu) == ncol(x))
-  stopifnot(length(prior$prior.inclusion.probabilities) == ncol(x))
-
-  ## The following is for backward compatibility.  A max.flips
-  ## argument was added to SpikeSlabPrior.
-  if (is.null(prior$max.flips)) {
-    prior$max.flips <- -1
-  }
-
-  ans <- .Call(do_spike_slab,
-               x,
-               y,
-               prior,
-               niter,
-               ping,
-               seed)
-  variable.names <- dimnames(x)[[2]]
-  if (!is.null(variable.names)) {
-    colnames(ans$beta) <- variable.names
-  }
-  ans$prior <- prior
-  class(ans) <- "lm.spike"
-  return(ans)
 }

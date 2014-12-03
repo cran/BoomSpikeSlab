@@ -13,7 +13,13 @@
 }
 
 \usage{
-\method{summary}{logit.spike}(object, burn = 0, order = TRUE, ...)
+\method{summary}{logit.spike}(object,
+        burn = 0,
+        order = TRUE,
+        cutpoint.scale = c("probability", "logit"),
+        cutpoint.basis = c("sample.size", "equal.range"),
+        number.of.buckets = 10,
+        ...)
 }
 \arguments{
   \item{object}{
@@ -30,6 +36,19 @@
     Otherwise the order of the coefficients is the same as in
     \code{object}.  }
 
+  \item{cutpoint.scale}{The scale that should be used to determine the
+    buckets for the comparison of predicted and actual probabilities.}
+
+  \item{cutpoint.basis}{How should the buckets be determined in the
+    comparison of predicted to actual probabilities?  If
+    "sample.sample", then each bucket contains the same fraction of
+    data.  If "equal.range" then the buckets are formed by parititioning
+    the range of the predicted probabilities, and each bucket occupies
+    the same amount of space on the real line.}
+
+  \item{number.of.buckets}{The number of buckets to use in the
+    comparison of predicted to actual probabilities.}
+
   \item{\dots}{
     Unused.  Present for compatibility with generic summary().
   }
@@ -37,13 +56,34 @@
 }
 
 \value{
+  Returns a list with the following elements
+  \itemize{
 
- A five-column matrix with rows representing model coefficients.  The
- first two columns are the posterior mean and standard deviation of each
- coefficient, including the point mass at zero.  The next two columns
- are the posterior mean and standard deviations conditional on the
- coefficient being nonzero.  The last column is the probability of a
- nonzero coefficient.
+    \item{coefficients: A five-column matrix summarizing the model
+      coefficients, produced by
+      \code{\link{SummarizeSpikeSlabCoefficients}}.}
+
+    \item{null.log.likelihood: The log likelihood of the null binomial
+      model evaluated at the MLE.}
+
+    \item{mean.log.likelihood: The average value of log likelihood
+      visited by the sampler.}
+
+    \item{max.log.likelihood: The largest log likelihood value visited
+      by the sampler.}
+
+    \item{deviance.r2: The deviance R-square obtained by taking
+      \code{(null.likelihood - mean.log.likelihood) /
+	null.log.likelihood}}
+
+    \item{deviance.r2.distribution: The value of the deviance R-square
+      statistic at each point visited by the MCMC chain.  This is not
+      printed by the print method.}
+
+    \item{predicted.vs.actual}{A table obtained by paritioning the data
+      into buckets, and comparing the aveage predicted probability with
+      the empirical success rate in each bucket.}
+  }
 }
 
 \author{
@@ -56,7 +96,6 @@
 }
 
 \examples{
-
   n <- 100
   p <- 10
   ngood <- 3

@@ -10,27 +10,19 @@
 }
 
 \usage{
-SpikeSlabPriorBase(x = NULL,
-                   y = NULL,
+SpikeSlabPriorBase(number.of.variables,
                    expected.r2 = .5,
                    prior.df = .01,
                    expected.model.size = 1,
                    optional.coefficient.estimate = NULL,
-                   mean.y = mean(y, na.rm = TRUE),
-                   sdy = sd(as.numeric(y), na.rm = TRUE),
+                   mean.y,
+                   sdy,
                    prior.inclusion.probabilities = NULL,
-                   number.of.observations = nrow(x),
-                   number.of.variables = ncol(x) )
+                   sigma.upper.limit = Inf)
 }
 
 \arguments{
-  \item{x}{
-    The design matrix for the regression problem.  Missing data is not allowed.
-  }
-
-  \item{y}{
-    The vector of responses for the regression.  Missing data is not allowed.
-  }
+  \item{number.of.variables}{The number of columns in \code{x}.}
 
   \item{expected.r2}{
     The expected R-square for the regression.  The spike and slab prior
@@ -48,34 +40,55 @@ SpikeSlabPriorBase(x = NULL,
     \code{expected.r2} argument.
   }
 
-  \item{expected.model.size}{
-    A positive number less than \code{ncol(x)}, representing a guess at
-    the number of significant predictor p variables.  Used to obtain the
-    'spike' portion of the spike and slab prior.  The default value
-    leads to \code{pi[i] = .5}, which is the uniform distribution over
-    the space of models.
+  \item{expected.model.size}{ A positive number less than
+    \code{ncol(x)}, representing a guess at the number of significant
+    predictor p variables.  Used to compute a default value of
+    \code{prior.inclusion.probabilities} if the latter is \code{NULL}.
   }
 
   \item{optional.coefficient.estimate}{ If desired, an estimate of the
     regression coefficients can be supplied.  In most cases this will be
     a difficult parameter to specify.  If omitted then a prior mean of
     zero will be used for all coordinates except the intercept, which
-    will be set to mean(y).  }
+    will be set to \code{mean.y}.  }
 
-  \item{mean.y}{The mean of the response vector, for use in cases when
-    specifying the response vector is undesirable.}
+  \item{mean.y}{The mean of the response vector.  Used to create a
+    default value of \code{optional.coefficient.estimate} when the latter
+    is \code{NULL}.}
 
-  \item{sdy}{The standard deviation of the response vector, for use in
-    cases when specifying the response vector is undesirable.}
+  \item{sdy}{The standard deviation of the response vector.  Used along
+    with \code{expected.r2} to create a prior estimate of the residual
+    variance.}
 
   \item{prior.inclusion.probabilities}{A vector giving the prior
-    probability of inclusion for each variable.}
+    probability of inclusion for each coefficient.}
 
-  \item{number.of.observations}{The number of rows in \code{x} and
-    \code{y}.}
+  \item{sigma.upper.limit}{The largest acceptable value for the residual
+    standard deviation.  A non-positive number is interpreted as
+    \code{Inf}.}  }
 
-  \item{number.of.variables}{The number of columns in \code{x}.}
+\value{Returns an object of class \code{SpikeSlabPriorBase}, which is a
+  list with the following elements.
+\itemize{
+  \item{prior.inclusion.probabilities}{A vector giving the prior
+    probability of inclusion for each coefficient. }
 
+  \item{mu}{A vector giving the prior mean of each coefficient
+    conditional on inclusion. }
+
+  \item{sigma.guess}{A prior estimate of the residual standard
+    deviation.}
+
+  \item{prior.df}{The number of observations worth of weight to be
+    given to \code{sigma.guess}.}
+}
+}
+
+\references{
+  George and McCulloch (1997), "Approaches to Bayesian Variable
+  Selection", \emph{Statistica Sinica}, \bold{7}, 339 -- 373.
+
+  \url{http://www3.stat.sinica.edu.tw/statistica/oldpdf/A7n26.pdf}
 }
 
 \author{

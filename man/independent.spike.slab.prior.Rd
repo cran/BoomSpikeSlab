@@ -24,7 +24,9 @@ IndependentSpikeSlabPrior(x = NULL,
                           sdx = apply(as.matrix(x), 2, sd, na.rm = TRUE),
                           prior.inclusion.probabilities = NULL,
                           number.of.observations = nrow(x),
-                          number.of.variables = ncol(x))
+                          number.of.variables = ncol(x),
+                          scale.by.residual.variance = FALSE,
+                          sigma.upper.limit = Inf)
 }
 
 \arguments{
@@ -90,6 +92,17 @@ IndependentSpikeSlabPrior(x = NULL,
 
   \item{number.of.variables}{The number of potential predictor variables
     in the data to be modeled.}
+
+  \item{scale.by.residual.variance}{If \code{TRUE} the prior variance is
+    \code{sigma_sq * V}, where \code{sigma_sq} is the residual variance of the
+    linear regression modeled by this prior.  Otherwise the prior
+    variance is \code{V}, unscaled. }
+
+  \item{sigma.upper.limit}{The largest acceptable value for the residual
+    standard deviation.  A non-positive number is interpreted as
+    \code{Inf}.
+  }
+
 }
 
 \value{

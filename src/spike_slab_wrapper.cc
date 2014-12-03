@@ -18,6 +18,7 @@
 #include "r_interface/handle_exception.hpp"
 #include "r_interface/list_io.hpp"
 #include "r_interface/print_R_timestamp.hpp"
+#include "r_interface/prior_specification.hpp"
 #include "r_interface/seed_rng_from_R.hpp"
 
 #include "cpputil/Ptr.hpp"
@@ -26,28 +27,12 @@ namespace {
   using namespace BOOM;  // NOLINT
   using namespace BOOM::RInterface;  // NOLINT
 
-  Ptr<IndependentMvnModelGivenScalarSigma>
-  ExtractIndependentBetaPrior(SEXP prior, Ptr<UnivParams> sigsq) {
-    Vector prior_mean(ToBoomVector(getListElement(prior, "mu")));
-    Vector prior_variance_diagonal(
-        ToBoomVector(getListElement(prior, "prior.variance.diagonal")));
-    return new IndependentMvnModelGivenScalarSigma(
-        new VectorParams(prior_mean),
-        new VectorParams(prior_variance_diagonal),
-        sigsq);
-  }
-
-  Ptr<MvnGivenScalarSigma>
-  ExtractZellnerPrior(SEXP prior, Ptr<UnivParams> sigsq) {
-    Vector prior_mean(ToBoomVector(getListElement(prior, "mu")));
-    SpdMatrix prior_precision(ToBoomSpd(getListElement(prior, "siginv")));
-    return new MvnGivenScalarSigma(prior_mean, prior_precision, sigsq);
-  }
-
   Ptr<RegressionModel> SpecifyRegressionModel(
       SEXP r_design_matrix,
       SEXP r_response_vector,
       SEXP r_spike_slab_prior,
+      SEXP r_bma_method,
+      SEXP r_oda_options,
       BOOM::RListIoManager *io_manager) {
     Vector y(ToBoomVector(r_response_vector));
     Matrix X(ToBoomMatrix(r_design_matrix));
@@ -60,40 +45,42 @@ namespace {
     model->coef().drop_all();
     model->coef().add(0);  // start with the intercept
 
-    Vector prior_inclusion_probabilities =
-        ToBoomVector(getListElement(
-            r_spike_slab_prior, "prior.inclusion.probabilities"));
-
-    double prior_df = Rf_asReal(getListElement(
-        r_spike_slab_prior, "prior.df"));
-    double sigma_guess = Rf_asReal(getListElement(
-        r_spike_slab_prior, "sigma.guess"));
-    Ptr<ChisqModel> siginv_prior(new ChisqModel(prior_df, sigma_guess));
-
-    if (Rf_inherits(r_spike_slab_prior, "SpikeSlabPrior")) {
-      Ptr<MvnGivenScalarSigma> beta_prior = ExtractZellnerPrior(
+    std::string bma_method = ToString(r_bma_method);
+    if (bma_method == "SSVS") {
+      BOOM::RInterface::RegressionConjugateSpikeSlabPrior prior(
           r_spike_slab_prior, model->Sigsq_prm());
-      Ptr<BregVsSampler> sampler(new BregVsSampler(
+      NEW(BregVsSampler, ssvs_sampler)(
           model.get(),
-          beta_prior,
-          siginv_prior,
-          new VariableSelectionPrior(prior_inclusion_probabilities)));
-      int max_flips = Rf_asInteger(getListElement(
-          r_spike_slab_prior, "max.flips"));
-      if (max_flips > 0) {
-        sampler->limit_model_selection(max_flips);
+          prior.slab(),
+          prior.siginv_prior(),
+          prior.spike());
+      ssvs_sampler->set_sigma_upper_limit(prior.sigma_upper_limit());
+      if (prior.max_flips() > 0) {
+        ssvs_sampler->limit_model_selection(prior.max_flips());
       }
-      model->set_method(sampler);
-    } else if (Rf_inherits(r_spike_slab_prior, "IndependentSpikeSlabPrior")) {
-      Ptr<IndependentMvnModelGivenScalarSigma> beta_prior =
-          ExtractIndependentBetaPrior(r_spike_slab_prior, model->Sigsq_prm());
-      Ptr<SpikeSlabDaRegressionSampler> sampler(
-          new SpikeSlabDaRegressionSampler(
+      model->set_method(ssvs_sampler);
+    } else if (bma_method == "ODA") {
+      BOOM::RInterface::IndependentRegressionSpikeSlabPrior prior(
+          r_spike_slab_prior, model->Sigsq_prm());
+      double eigenvalue_fudge_factor = .01;
+      double fallback_probability = 0.0;
+      if (!Rf_isNull(r_oda_options)) {
+        eigenvalue_fudge_factor = Rf_asReal(getListElement(
+            r_oda_options,
+            "eigenvalue.fudge.factor"));
+        fallback_probability = Rf_asReal(getListElement(
+            r_oda_options,
+            "fallback.probability"));
+      }
+      NEW(SpikeSlabDaRegressionSampler, oda_sampler)(
               model.get(),
-              beta_prior,
-              siginv_prior,
-              prior_inclusion_probabilities));
-      model->set_method(sampler);
+              prior.slab(),
+              prior.siginv_prior(),
+              prior.prior_inclusion_probabilities(),
+              eigenvalue_fudge_factor,
+              fallback_probability);
+      oda_sampler->set_sigma_upper_limit(prior.sigma_upper_limit());
+      model->set_method(oda_sampler);
     }
     io_manager->add_list_element(
         new GlmCoefsListElement(model->coef_prm(), "beta"));
@@ -113,6 +100,8 @@ extern "C" {
                                        SEXP r_spike_slab_prior,
                                        SEXP r_niter,
                                        SEXP r_ping,
+                                       SEXP r_bma_method,
+                                       SEXP r_oda_options,
                                        SEXP r_seed) {
     RErrorReporter error_reporter;
     try {
@@ -122,6 +111,8 @@ extern "C" {
           r_design_matrix,
           r_response_vector,
           r_spike_slab_prior,
+          r_bma_method,
+          r_oda_options,
           &io_manager);
 
       int niter = Rf_asInteger(r_niter);
