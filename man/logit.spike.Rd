@@ -179,21 +179,14 @@ logit.spike(formula,
 }
 
 \examples{
-simulate.logit.spike <- function(n = 100, p = 10, ngood = 3,
-                              niter=1000){
-  x <- cbind(1, matrix(rnorm(n * (p-1)), nrow=n))
-  beta <- c(rnorm(ngood), rep(0, p - ngood))
-  prob <- plogis(x \%*\% beta)
-  y <- runif(n) < prob
-  x <- x[,-1]
-  draws <- logit.spike(y ~ x, niter=niter)
-  plot.ts(draws$beta)
-  return(invisible(draws))
-}
-model <- simulate.logit.spike()
+data(Pima.tr)
+data(Pima.te)
+pima <- rbind(Pima.tr, Pima.te)
+model <- logit.spike(type == "Yes" ~ ., data = pima, niter = 500)
 plot(model)
 plot(model, "fit")
 plot(model, "residuals")
+plot(model, "size")
 summary(model)
 }
 \keyword{models}

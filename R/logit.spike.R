@@ -177,7 +177,7 @@ logit.spike <- function(formula,
   ans$log.likelihood <- colSums(log.likelihood.contributions)
   sign <- rep(1, length(response))
   sign[response / ny < 0.5] <- -1
-  deviance.residuals <- sign * sqrt(rowMeans(
+  ans$deviance.residuals <- sign * sqrt(rowMeans(
       -2 * log.likelihood.contributions))
 
   ans$null.log.likelihood <- sum(
@@ -326,7 +326,7 @@ plot.logit.spike <- function(
   } else if (y == "residuals") {
     PlotLogitSpikeResiduals(x, ...)
   } else if (y == "size") {
-    PlotModelSize(x, ...)
+    PlotModelSize(x$beta, ...)
   } else {
     stop("Unrecognized option", y, "in plot.logit.spike")
   }
@@ -401,9 +401,6 @@ PlotLogitSpikeFitSummary <- function(
   }
   if (which.summary %in% c("both", "r2")) {
     r2 <- fit$deviance.r2.distribution
-    if (burn > 0) {
-      r2 <- r2[-(1:burn)]
-    }
     plot.ts(r2,
             xlab = "MCMC Iteration",
             ylab = "deviance R-square",

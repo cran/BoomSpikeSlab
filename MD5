@@ -1,14 +1,14 @@
-b491be3bd4b6b984985b54a75bff5d7e *DESCRIPTION
+8887eddee8afd8abaa2585a62ff56136 *DESCRIPTION
 e8e55066c18d09240bef5cf40e7ec67c *LICENSE
 3162caf2df3e9d1c0d72843355b81da3 *NAMESPACE
 b6d0ff5872bc5032ffa59a433ee46920 *R/lm.spike.R
-5b9fba7a9b01d3e9cfe73c32154504b3 *R/logit.spike.R
+a3f1042bb7ea0ad696c70ea04e40aa94 *R/logit.spike.R
 faab29dbf542a067c5d6bcbe456b576b *R/mlm.spike.R
 0d9821a7d92df4a1a5e59c55d26c442d *R/poisson.spike.R
 f83b57e58319b08a7d5ce221b8980f97 *R/spike.slab.prior.R
 6ff17ac3c93dbdd2f34d1e066784fa8b *man/independent.spike.slab.prior.Rd
 9d5bb2d37e9df645085e29abe7b35de4 *man/lm.spike.Rd
-bf0d3ac034d6a097cde021088b5098e7 *man/logit.spike.Rd
+bc0bc117a2491bfe70a07aed724962f3 *man/logit.spike.Rd
 3a39bb84a93772bd420c26391018e22a *man/make.spike.slab.prior.Rd
 65e1efbbdaf78427748a5a8225abbd1b *man/mlm.spike.Rd
 c1d87acce9777fe70346b48489fcb899 *man/mlm.spike.slab.prior.Rd
