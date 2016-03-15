@@ -1,40 +1,39 @@
-% Copyright 2010 Google Inc. All Rights Reserved.
-% Author: stevescott@google.com (Steve Scott)
-
-\name{make.spike.slab.prior}
+\name{student.spike.slab.prior}
 \Rdversion{1.1}
-\alias{SpikeSlabPrior}
+\alias{StudentSpikeSlabPrior}
 \title{
-  Create a spike and slab prior for use with lm.spike.
+  Spike and Slab Prior for Student-T Regression
 }
 \description{
-  Creates a spike and slab prior for use with lm.spike.
+  A Zellner-style spike and slab prior for regression models with
+  Student-t errors.
 }
 \usage{
-SpikeSlabPrior(x,
-               y = NULL,
-               expected.r2 = .5,
-               prior.df = .01,
-               expected.model.size = 1,
-               prior.information.weight = .01,
-               diagonal.shrinkage = .5,
-               optional.coefficient.estimate = NULL,
-               max.flips = -1,
-               mean.y = mean(y, na.rm = TRUE),
-               sdy = sd(as.numeric(y), na.rm = TRUE),
-               prior.inclusion.probabilities = NULL,
-               sigma.upper.limit = Inf)
-
+StudentSpikeSlabPrior(predictor.matrix,
+    response.vector = NULL,
+    expected.r2 = .5,
+    prior.df = .01,
+    expected.model.size = 1,
+    prior.information.weight = .01,
+    diagonal.shrinkage = .5,
+    optional.coefficient.estimate = NULL,
+    max.flips = -1,
+    mean.y = mean(response.vector, na.rm = TRUE),
+    sdy = sd(as.numeric(response.vector), na.rm = TRUE),
+    prior.inclusion.probabilities = NULL,
+    sigma.upper.limit = Inf,
+    degrees.of.freedom.prior = UniformPrior(.1, 100))
 }
+
 \arguments{
-  \item{x}{
+  \item{predictor.matrix}{
     The design matrix for the regression problem.  Missing data is not allowed.
   }
 
-  \item{y}{ The vector of responses for the regression.  Missing data is
-    not allowed.  If \code{y} is not available, you can pass \code{y =
-      NULL}, and specify \code{mean.y} and \code{sdy} instead.
-  }
+  \item{response.vector}{ The vector of responses for the regression.
+    Missing data is not allowed.  If \code{response.vector} is not
+    available, you can pass \code{response.vector = NULL}, and specify
+    \code{mean.y} and \code{sdy} instead.  }
 
   \item{expected.r2}{
     The expected R-square for the regression.  The spike and slab prior
@@ -94,13 +93,14 @@ SpikeSlabPrior(x,
   \item{sigma.upper.limit}{The largest acceptable value for the residual
     standard deviation.  A non-positive number is interpreted as
     \code{Inf}.}
+
+  \item{degrees.of.freedom.prior}{An object of class
+    \code{\link[Boom]{DoubleModel}} representing the prior distribution for the
+    Student T tail thickness (or "degrees of freedom") parameter.}
 }
 
-\value{
-  A list with with the components necessary to run \code{lm.spike}.
-}
-\author{
-  Steven L. Scott
+\value{ A \code{\link{SpikeSlabPrior}} with
+  \code{degrees.of.freedom.prior} appended.  } \author{ Steven L. Scott
 }
 
 \references{
@@ -110,23 +110,5 @@ SpikeSlabPrior(x,
   \url{http://www3.stat.sinica.edu.tw/statistica/oldpdf/A7n26.pdf}
 }
 
-\examples{
-  x <- cbind(1, matrix(rnorm(900), ncol = 9))
-  beta <- rep(0, 10)
-  beta[1] <- 3
-  beta[5] <- -4
-  beta[8] <- 2
-  y <- rnorm(100, x \%*\% beta)
-  ## x has 10 columns, including the intercept
-  prior <- SpikeSlabPrior(x, y,
-             expected.model.size = 3,  # expect 3 nonzero predictors
-             prior.df = .01,           # weaker prior than the default
-             prior.information.weight = .01,
-             diagonal.shrinkage = 0,   # use Zellner's prior
-             optional.coefficient.estimate = rep(0, 10) # shrink to zero
-          )
-  ## now 'prior' can be fed to 'lm.spike'
-  model <- lm.spike(y ~ x - 1, niter = 1000, prior = prior)
-}
 \keyword{models}
 \keyword{regression}

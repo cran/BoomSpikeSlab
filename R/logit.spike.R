@@ -28,9 +28,9 @@ logit.spike <- function(formula,
   ##   data:  optional data.frame containing the data described in 'formula'
   ##   subset: an optional vector specifying a subset of observations
   ##     to be used in the fitting process.
-  ##   prior: an optional list such as that returned from
-  ##     SpikeSlabPrior.  If missing, SpikeSlabPrior
-  ##     will be called with the remaining arguments.
+  ##   prior: an optional object inheriting from LogitPrior and
+  ##     SpikeSlabPriorBase.  If missing, a prior will be constructed
+  ##     by calling LogitZellnerPrior with the remaining arguments.
   ##   na.action: a function which indicates what should happen when
   ##     the data contain ‘NA’s.  The default is set by the
   ##     ‘na.action’ setting of ‘options’, and is ‘na.fail’ if that is
@@ -64,7 +64,7 @@ logit.spike <- function(formula,
   ##   seed: Seed to use for the C++ random number generator.  NULL or
   ##     an int.  If NULL, then the seed will be taken from the global
   ##     .Random.seed object.
-  ##   ... : parameters to be passed to SpikeSlabPrior
+  ##   ... : parameters to be passed to LogitZellnerPrior.
   ##
   ## Returns:
   ##   An object of class 'logit.spike', which is a list containing the
@@ -104,11 +104,11 @@ logit.spike <- function(formula,
 
   design <- model.matrix(mt, mf, contrasts)
   if (is.null(prior)) {
-    prior <- SpikeSlabPrior(design, response, ...)
+    prior <- LogitZellnerPrior(design, response, ...)
   }
   stopifnot(inherits(prior, "SpikeSlabPriorBase"))
+  stopifnot(inherits(prior, "LogitPrior"))
 
-  p.hat <- sum(response) / sum(ny)
   if (!is.null(initial.value)) {
     if (inherits(initial.value, "logit.spike")) {
       stopifnot(colnames(initial.value$beta) == colnames(design))
@@ -125,10 +125,7 @@ logit.spike <- function(formula,
     }
   } else {
     ## No initial value was supplied
-    beta0 <- rep(0, ncol(design))
-    if (all(design[, 1] == 1)) {
-      beta0[1] <- qlogis(p.hat)
-    }
+    beta0 <- prior$mu
   }
 
   stopifnot(is.matrix(design),
@@ -145,7 +142,6 @@ logit.spike <- function(formula,
   if (!is.null(seed)) {
     seed <- as.integer(seed)
   }
-
   ans <- .Call("logit_spike_slab_wrapper",
                as.matrix(design),
                as.integer(response),
@@ -160,7 +156,7 @@ logit.spike <- function(formula,
                seed)
 
   ans$prior <- prior
-  class(ans) <- c("logit.spike", "lm.spike")
+  class(ans) <- c("logit.spike", "glm.spike")
 
   ## The stuff below will be needed by predict.logit.spike.
   ans$contrasts <- attr(design, "contrasts")
@@ -180,6 +176,7 @@ logit.spike <- function(formula,
   ans$deviance.residuals <- sign * sqrt(rowMeans(
       -2 * log.likelihood.contributions))
 
+  p.hat <- sum(response) / sum(ny)
   ans$null.log.likelihood <- sum(
       response * log(p.hat) + (ny - response) * log(1 - p.hat))
 
@@ -194,7 +191,6 @@ logit.spike <- function(formula,
   #
   # dimension of fitted values is nobs x niter
 
-
   if (!is.null(initial.value) && inherits(initial.value, "logit.spike")) {
     ans$beta <- rbind(initial.value$beta, ans$beta)
   }
@@ -206,7 +202,7 @@ logit.spike <- function(formula,
   colnames(ans$beta) <- colnames(design)
 
   ## Make the answer a class, so that the right methods will be used.
-  class(ans) <- c("logit.spike", "lm.spike")
+  class(ans) <- c("logit.spike", "lm.spike", "glm.spike")
   return(ans)
 }
 
@@ -230,87 +226,20 @@ predict.logit.spike <- function(object, newdata, burn = 0,
   ## Returns:
   ##   A matrix of predictions, with each row corresponding to a row
   ##   in newdata, and each column to an MCMC iteration.
-
   type <- match.arg(type)
-
-  beta.dimension <- ncol(object$beta)
-  if (is.data.frame(newdata)) {
-    tt <- terms(object)
-    Terms <- delete.response(tt)
-    m <- model.frame(Terms, newdata, na.action = na.action,
-                     xlev = object$xlevels)
-    if (!is.null(cl <- attr(Terms, "dataClasses"))) .checkMFClasses(cl, m)
-    X <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
-
-    if (nrow(X) != nrow(newdata)) {
-      warning("Some entries in newdata have missing values, and will",
-              "be omitted from the prediction.")
-    }
-  } else if (is.matrix(newdata)) {
-    X <- newdata
-    if (ncol(X) == beta.dimension - 1) {
-      if (attributes(object$terms)$intercept) {
-        X <- cbind(1, X)
-        warning("Implicit intercept added to newdata.")
-      }
-    }
-  } else if (is.vector(newdata) && beta.dimension == 2) {
-    if (attributes(object$terms)$intercept) {
-      X <- cbind(1, newdata)
-    }
-  } else if (is.vector(newdata) && beta.dimension == 1) {
-    X <- matrix(newdata, ncol=1)
-  } else {
-    stop("Error in predict.logit.spike:  newdata must be a matrix,",
-         "or a data.frame,",
-         "unless dim(beta) <= 2, in which case it can be a vector")
-  }
-
-  if (ncol(X) != beta.dimension) {
-    stop("The number of coefficients does not match the number",
-         "of predictors in logit.spike")
-  }
+  predictors <- GetPredictorMatrix(object, newdata, na.action = na.action, ...)
   beta <- object$beta
   if (burn > 0) {
     beta <- beta[-(1:burn), , drop = FALSE]
   }
-
-  eta <- X %*% t(beta)
+  eta <- predictors %*% t(beta)
   if (type == "logit" || type == "link") return(eta)
   if (type == "prob" || type == "response") return(plogis(eta))
 }
 
-SuggestBurnLogLikelihood <- function(log.likelihood, fraction = .25) {
-  ## Suggests a burn-in period for an MCMC chain based on the log
-  ## likelihood values simulated on the last leg of the chain.
-  ## Args:
-  ##   log.likelihood: The MCMC sample path of log likelihood for a
-  ##     model.
-  ##   fraction: The fraction of the chain that should be used to
-  ##     determine the log likelihood lower bound.
-  ##
-  ## Returns:
-  ##   An iteration number to be used as a burn-in.
-  ##
-  ## Details:
-  ##   Look at the last 'fraction' of the log.likelihood sequence and
-  ##   find the minimum value.  Then return the first iteration where
-  ##   log.likelihood exceeds this value.
-  FindFirst <- function (logical.sequence) {
-    # Returns the position of the first TRUE in a sequence of
-    # logicals.
-    if (logical.sequence[1]) return(1)
-    y <- rle(logical.sequence)
-    return(y$lengths[1] + 1)
-  }
-  cutpoint <- round(fraction * length(log.likelihood))
-  min.log.likelihood <- min(tail(log.likelihood, cutpoint))
-  return(FindFirst(log.likelihood >= min.log.likelihood))
-}
-
 plot.logit.spike <- function(
     x,
-    y = c("coefficients", "fit", "residuals", "size"),
+    y = c("coefficients", "fit", "residuals", "size", "help"),
     ...) {
   ## S3 method for plotting logit.spike objects.
   ## Args:
@@ -327,6 +256,8 @@ plot.logit.spike <- function(
     PlotLogitSpikeResiduals(x, ...)
   } else if (y == "size") {
     PlotModelSize(x$beta, ...)
+  } else if (y == "help") {
+    help("plot.logit.spike", package = "BoomSpikeSlab", help_type = "html")
   } else {
     stop("Unrecognized option", y, "in plot.logit.spike")
   }
@@ -419,14 +350,17 @@ PlotLogitSpikeFitSummary <- function(
       y.label = "observed probability"
     }
     if (any(is.na(bucket.fit))) {
-      warning("Some buckets were empty, or had empirical probabilities of 0 or 1.")
+      warning(
+          "Some buckets were empty, or had empirical probabilities of 0 or 1.")
     }
     plot(bucket.fit,
          main = "Probabilities by decile",
          xlab = x.label,
          ylab = y.label,
          ...)
-    abline(v = attributes(bucket.fit)$cutpoints, lty = 3, col = "lightgray")
+    if (length(attributes(bucket.fit)$cutpoints) > 1) {
+      abline(v = attributes(bucket.fit)$cutpoints, lty = 3, col = "lightgray")
+    }
     abline(a = 0, b = 1)
   }
 }
@@ -438,6 +372,7 @@ summary.logit.spike <- function(
     cutpoint.scale = c("probability", "logit"),
     cutpoint.basis = c("sample.size", "equal.range"),
     number.of.buckets = 10,
+    coefficients = TRUE,
     ...) {
   ## Summary method for logit.spike coefficients
   ## Args:
@@ -449,8 +384,12 @@ summary.logit.spike <- function(
   ## Returns:
   ## An object of class 'summary.logit.spike' that summarizes the
   ## model coefficients as in SummarizeSpikeSlabCoefficients.
-  coefficient.table <-
-      SummarizeSpikeSlabCoefficients(object$beta, burn, order)
+  if (coefficients) {
+    coefficient.table <-
+        SummarizeSpikeSlabCoefficients(object$beta, burn, order)
+  } else {
+    coefficient.table <- NULL
+  }
 
   deviance.r2 <- (object$null.log.likelihood - object$log.likelihood) /
       object$null.log.likelihood
@@ -482,6 +421,13 @@ summary.logit.spike <- function(
                      max(fitted.range),
                      len = number.of.buckets + 1)
   }
+  cutpoints <- unique(cutpoints)
+  if (length(cutpoints) == 1) {
+    ## Changing the type of "cutpoints" to keep R from choking on a
+    ## "breaks" argument of length 1.
+    cutpoints <- 2
+  }
+
   bucket.indicators <- cut(fitted, cutpoints)
   fitted.value.buckets <- split(fitted, bucket.indicators)
 
@@ -515,6 +461,8 @@ print.summary.logit.spike <- function(x, ...) {
   fit <- x$predicted.vs.actual
   attributes(fit)$cutpoints <- NULL
   print(fit)
-  cat("\nsummary of coefficients:\n")
-  print.default(signif(x$coefficients, 3))
+  if (!is.null(x$coefficients)) {
+    cat("\nsummary of coefficients:\n")
+    print.default(signif(x$coefficients, 3))
+  }
 }

@@ -20,12 +20,25 @@
 #include "r_interface/print_R_timestamp.hpp"
 #include "r_interface/prior_specification.hpp"
 #include "r_interface/seed_rng_from_R.hpp"
+#include "utils.h"
 
 #include "cpputil/Ptr.hpp"
 
 namespace {
   using namespace BOOM;  // NOLINT
   using namespace BOOM::RInterface;  // NOLINT
+
+  class SseCallback
+      : public BOOM::ScalarIoCallback {
+   public:
+    SseCallback(RegressionModel *model)
+        : model_(model) {}
+    double get_value() const override {
+      return model_->suf()->relative_sse(model_->coef());
+    }
+   private:
+    RegressionModel *model_;
+  };
 
   Ptr<RegressionModel> SpecifyRegressionModel(
       SEXP r_design_matrix,
@@ -59,6 +72,11 @@ namespace {
         ssvs_sampler->limit_model_selection(prior.max_flips());
       }
       model->set_method(ssvs_sampler);
+      BOOM::spikeslab::InitializeCoefficients(
+          model->Beta(),
+          prior.spike()->prior_inclusion_probabilities(),
+          model,
+          ssvs_sampler);
     } else if (bma_method == "ODA") {
       BOOM::RInterface::IndependentRegressionSpikeSlabPrior prior(
           r_spike_slab_prior, model->Sigsq_prm());
@@ -81,11 +99,19 @@ namespace {
               fallback_probability);
       oda_sampler->set_sigma_upper_limit(prior.sigma_upper_limit());
       model->set_method(oda_sampler);
+      BOOM::spikeslab::InitializeCoefficients(
+          model->Beta(),
+          prior.spike()->prior_inclusion_probabilities(),
+          model,
+          oda_sampler);
     }
     io_manager->add_list_element(
         new GlmCoefsListElement(model->coef_prm(), "beta"));
     io_manager->add_list_element(
         new StandardDeviationListElement(model->Sigsq_prm(), "sigma"));
+    io_manager->add_list_element(
+        new NativeUnivariateListElement(
+            new SseCallback(model.get()), "sse", nullptr));
     return(model);
   }
 }  // namespace
@@ -122,6 +148,7 @@ extern "C" {
       for (int i = 0; i < niter; ++i) {
         if (RCheckInterrupt()) {
           error_reporter.SetError("Canceled by user.");
+          UNPROTECT(1);
           return R_NilValue;
         }
         print_R_timestamp(i, ping);

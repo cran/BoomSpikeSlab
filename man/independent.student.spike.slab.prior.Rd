@@ -1,40 +1,41 @@
-\name{independent.spike.slab.prior}
+\name{independent.student.spike.slab.prior}
 
 \Rdversion{1.1}
-\alias{IndependentSpikeSlabPrior}
+\alias{StudentIndependentSpikeSlabPrior}
 \title{
-  A spike and slab prior assuming a priori independence.
+  Spike and Slab Prior for Regressions with Student T Errors
 }
 
-\description{
-  A spike and slab prior on the regression coefficients.  The prior
-  distribution assumes coefficients to be independent.
-}
+\description{ A spike and slab prior on the parameters of a regression
+  model with Student T errors.  The prior assumes independence amon the
+  regression coefficients.  }
 
 \usage{
-IndependentSpikeSlabPrior(x = NULL,
-                          y = NULL,
-                          expected.r2 = .5,
-                          prior.df = .01,
-                          expected.model.size = 1,
-                          prior.beta.sd = NULL,
-                          optional.coefficient.estimate = NULL,
-                          mean.y = mean(y, na.rm = TRUE),
-                          sdy = sd(as.numeric(y), na.rm = TRUE),
-                          sdx = apply(as.matrix(x), 2, sd, na.rm = TRUE),
-                          prior.inclusion.probabilities = NULL,
-                          number.of.observations = nrow(x),
-                          number.of.variables = ncol(x),
-                          scale.by.residual.variance = FALSE,
-                          sigma.upper.limit = Inf)
+StudentIndependentSpikeSlabPrior(
+    predictor.matrix = NULL,
+    response.vector = NULL,
+    expected.r2 = .5,
+    prior.df = .01,
+    expected.model.size = 1,
+    prior.beta.sd = NULL,
+    optional.coefficient.estimate = NULL,
+    mean.y = mean(response.vector, na.rm = TRUE),
+    sdy = sd(as.numeric(response.vector), na.rm = TRUE),
+    sdx = apply(as.matrix(predictor.matrix), 2, sd, na.rm = TRUE),
+    prior.inclusion.probabilities = NULL,
+    number.of.observations = nrow(predictor.matrix),
+    number.of.variables = ncol(predictor.matrix),
+    scale.by.residual.variance = FALSE,
+    sigma.upper.limit = Inf,
+    degrees.of.freedom.prior = UniformPrior(.1, 100))
 }
 
 \arguments{
-  \item{x}{
+  \item{predictor.matrix}{
     The design matrix for the regression problem.  Missing data is not allowed.
   }
 
-  \item{y}{
+  \item{response.vector}{
     The vector of responses for the regression.  Missing data is not allowed.
   }
 
@@ -100,11 +101,14 @@ IndependentSpikeSlabPrior(x = NULL,
     \code{Inf}.
   }
 
+  \item{degrees.of.freedom.prior}{An object of class
+    \code{\link[Boom]{DoubleModel}} representing the prior distribution for the
+    Student T tail thickness (or "degrees of freedom") parameter.}
 }
 
 \value{
-  A list with with the components necessary to run \code{lm.spike} with
-  method "DA".
+  An \code{\link{IndependentSpikeSlabPrior}} with
+  \code{degrees.of.freedom.prior} appended.
 }
 
 \author{
@@ -118,23 +122,4 @@ IndependentSpikeSlabPrior(x = NULL,
   Association}, \bold{106} 1041-1052.
   \url{http://homepage.stat.uiowa.edu/~jghsh/ghosh_clyde_2011_jasa.pdf}
 
-}
-
-\examples{
-
-  x <- cbind(1, matrix(rnorm(900), ncol = 9))
-  beta <- rep(0, 10)
-  beta[1] <- 3
-  beta[5] <- -4
-  beta[8] <- 2
-  y <- rnorm(100, x \%*\% beta)
-  ## x has 10 columns, including the intercept
-  prior <- IndependentSpikeSlabPrior(x, y,
-             expected.model.size = 3,  # expect 3 nonzero predictors
-             prior.df = .01,           # weaker prior than the default
-             optional.coefficient.estimate = rep(0, 10) # shrink to zero
-          )
-  ## now 'prior' can be fed to 'lm.spike'
-  x <- x[, -1]
-  model <- lm.spike(y ~ x, niter = 1000, prior = prior, method = "DA")
 }

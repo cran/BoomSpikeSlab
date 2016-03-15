@@ -17,7 +17,7 @@
 }
 
 \usage{
-  \method{plot}{lm.spike}(x, y = c("coefficients", "size"), ...)
+  \method{plot}{lm.spike}(x, y = c("coefficients", "size", "help"), ...)
 }
 \arguments{
   \item{x}{
@@ -32,6 +32,11 @@
     that do the plotting.  }
 
 }
+
+\details{ The actual plotting will be handled by
+  \code{\link{PlotMarginalInclusionProbabilities}} or
+  \code{\link{PlotModelSize}}.  See the appropriate function for more
+  options.}
 
 \author{
   Steven L. Scott

@@ -1,13 +1,13 @@
-\name{plot.logit.spike}
+\name{plot.poisson.spike}
 \Rdversion{1.1}
-\alias{plot.logit.spike}
+\alias{plot.poisson.spike}
 \title{
-  Plot a \code{\link{logit.spike}} object
+  Plot a \code{\link{poisson.spike}} object
 }
 
 \description{
 
-  Plot a \code{\link{logit.spike}} object.  The default plot is a
+  Plot a \code{\link{poisson.spike}} object.  The default plot is a
   barplot of the marginal inclusion probabilities for each variable,
   as obtained by \code{\link{PlotMarginalInclusionProbabilities}}.
   See below for other types of plots.
@@ -15,13 +15,13 @@
 }
 
 \usage{
-  \method{plot}{logit.spike}(x,
-     y = c("coefficients", "fit", "residuals", "size", "help"),
+  \method{plot}{poisson.spike}(x,
+     y = c("coefficients", "size", "help"),
      ...)
 }
 \arguments{
   \item{x}{
-    An object of class \code{logit.spike}.
+    An object of class \code{poisson.spike}.
   }
 
   \item{y}{
@@ -39,12 +39,6 @@
   probabilities of the coefficients, constructed using
   \code{\link{PlotMarginalInclusionProbabilities}}.
 
-  The plot of the fit summary is handled by
-  \code{\link{PlotLogitSpikeFitSummary}}.
-
-  The plot of the residuals is handled by
-  \code{\link{PlotLogitSpikeResiduals}}.
-
   The plot of model size is handled by \code{\link{PlotModelSize}}.
 }
 
@@ -55,12 +49,10 @@
 \seealso{
   \code{\link{PlotMarginalInclusionProbabilities}}
   \code{\link{PlotModelSize}}
-  \code{\link{PlotLogitSpikeFitSummary}}
-  \code{\link{PlotLogitSpikeResiduals}}
 }
 
 \examples{
-## See the examples in ?logit.spike
+## See the examples in ?poisson.spike
 }
 \keyword{models}
 \keyword{regression}

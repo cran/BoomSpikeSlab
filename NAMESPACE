@@ -1,19 +1,35 @@
 import(Boom)
 
-export(lm.spike,
-       logit.spike,
-       mlm.spike,
-       poisson.spike,
+importFrom("grDevices", "gray")
+importFrom("graphics", "abline", "barplot", "hist", "legend", "par",
+           "plot", "strwidth")
+importFrom("stats", ".checkMFClasses", ".getXlevels", "as.formula",
+           "coef", "delete.response", "model.frame", "model.matrix",
+           "model.response", "na.omit", "na.pass", "plogis", "plot.ts",
+           "qchisq", "qlogis", "quantile", "reshape", "rnorm", "sd",
+           "terms", "update", "var")
+importFrom("utils", "help", "tail")
+
+export(GetPredictorMatrix,
        IndependentSpikeSlabPrior,
+       LogitZellnerPrior,
        MultinomialLogitSpikeSlabPrior,
        PlotLogitSpikeFitSummary,
        PlotLogitSpikeResiduals,
        PlotMarginalInclusionProbabilities,
        PlotModelSize,
+       PoissonZellnerPrior,
+       SpikeSlabGlmPrior,
        SpikeSlabPrior,
        SpikeSlabPriorBase,
+       StudentIndependentSpikeSlabPrior,
+       StudentSpikeSlabPrior,
        SummarizeSpikeSlabCoefficients,
+       lm.spike,
+       logit.spike,
+       mlm.spike,
        plot.lm.spike,
+       poisson.spike,
        predict.lm.spike,
        predict.poisson.spike,
        print.summary.lm.spike,
@@ -28,6 +44,9 @@ S3method(print, summary.lm.spike)
 S3method(plot, logit.spike)
 S3method(predict, logit.spike)
 S3method(summary, logit.spike)
+
+S3method(plot, poisson.spike)
+S3method(predict, poisson.spike)
 
 S3method(print, summary.logit.spike)
 useDynLib(BoomSpikeSlab,

@@ -52,11 +52,11 @@ logit.spike(formula,
   \item{subset}{ An optional vector specifying a subset of observations
     to be used in the fitting process.  }
 
-  \item{prior}{ A list such as that returned by
-    \code{\link{SpikeSlabPrior}}.  If \code{prior} is supplied it
-    will be used.  Otherwise a prior distribution will be built using
-    the remaining arguments.  See \code{\link{SpikeSlabPrior}}.
-  }
+  \item{prior}{A n object inheriting from \code{\link{LogitPrior}} and
+    \code{\link{SpikeSlabPriorBase}}.  If \code{prior} is supplied it
+    will be used.  Otherwise a prior distribution will constructed by
+    calling \code{\link{LogitZellnerPrior}} with the remaining
+    arguments. }
 
   \item{na.action}{A function which indicates what should happen when
     the data contain \code{NA}s.  The default is set by the
@@ -179,15 +179,17 @@ logit.spike(formula,
 }
 
 \examples{
-data(Pima.tr)
-data(Pima.te)
-pima <- rbind(Pima.tr, Pima.te)
-model <- logit.spike(type == "Yes" ~ ., data = pima, niter = 500)
-plot(model)
-plot(model, "fit")
-plot(model, "residuals")
-plot(model, "size")
-summary(model)
+if (requireNamespace("MASS")) {
+  data(Pima.tr)
+  data(Pima.te)
+  pima <- rbind(Pima.tr, Pima.te)
+  model <- logit.spike(type == "Yes" ~ ., data = pima, niter = 500)
+  plot(model)
+  plot(model, "fit")
+  plot(model, "residuals")
+  plot(model, "size")
+  summary(model)
+}
 }
 \keyword{models}
 \keyword{regression}

@@ -16,6 +16,8 @@
 #include "r_interface/prior_specification.hpp"
 #include "r_interface/seed_rng_from_R.hpp"
 
+#include "utils.h"
+
 #include "cpputil/Ptr.hpp"
 
 namespace {
@@ -27,11 +29,11 @@ namespace {
       SEXP r_exposure_vector,
       SEXP r_spike_slab_prior,
       SEXP r_nthreads,
+      SEXP r_initial_beta,
       RListIoManager *io_manager) {
     Matrix design_matrix(ToBoomMatrix(r_design_matrix));
     std::vector<int> response(ToIntVector(r_integer_response_vector));
     Vector exposure(ToBoomVector(r_exposure_vector));
-
     NEW(PoissonRegressionModel, model)(design_matrix.ncol());
     int n = response.size();
     for (int i = 0; i < n; ++i) {
@@ -42,15 +44,22 @@ namespace {
       model->add_data(data_point);
     }
     SpikeSlabGlmPrior prior_spec(r_spike_slab_prior);
+
+    int nthreads = std::max<int>(1, Rf_asInteger(r_nthreads));
     NEW(PoissonRegressionSpikeSlabSampler, sampler)(
         model.get(),
         prior_spec.slab(),
         prior_spec.spike(),
-        Rf_asInteger(r_nthreads));
+        nthreads);
     if (prior_spec.max_flips() > 0) {
       sampler->limit_model_selection(prior_spec.max_flips());
     }
     model->set_method(sampler);
+    BOOM::spikeslab::InitializeCoefficients(
+        ToBoomVector(r_initial_beta),
+        prior_spec.spike()->prior_inclusion_probabilities(),
+        model,
+        sampler);
 
     io_manager->add_list_element(new GlmCoefsListElement(
         model->coef_prm(),
@@ -84,6 +93,7 @@ extern "C" {
           r_exposure_vector,
           r_spike_slab_prior,
           r_nthreads,
+          r_initial_beta,
           &io_manager);
       int niter = Rf_asInteger(r_niter);
       int ping = Rf_asInteger(r_ping);

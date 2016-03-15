@@ -74,17 +74,18 @@ lm.spike <- function(formula,
   ## In addition, the returned object contains sufficient details for
   ## the call to model.matrix in the predict.lm.spike method.
 
-  cl <- match.call()
-  mf <- match.call(expand.dots = FALSE)
-  m <- match(c("formula", "data", "subset", "na.action"), names(mf), 0L)
-  mf <- mf[c(1L, m)]
-  mf$drop.unused.levels <- drop.unused.levels
-  mf[[1L]] <- as.name("model.frame")
-  mf <- eval(mf, parent.frame())
-  mt <- attr(mf, "terms")
-  y <- model.response(mf, "numeric")
+  function.call <- match.call()
+  frame <- match.call(expand.dots = FALSE)
+  name.positions <- match(c("formula", "data", "subset", "na.action"),
+                          names(frame), 0L)
+  frame <- frame[c(1L, name.positions)]
+  frame$drop.unused.levels <- drop.unused.levels
+  frame[[1L]] <- as.name("model.frame")
+  frame <- eval(frame, parent.frame())
+  model.terms <- attr(frame, "terms")
+  y <- model.response(frame, "numeric")
 
-  x <- model.matrix(mt, mf, contrasts)
+  x <- model.matrix(model.terms, frame, contrasts)
   bma.method <- match.arg(bma.method)
   if (is.null(prior)) {
     if (bma.method == "SSVS") {
@@ -131,23 +132,35 @@ lm.spike <- function(formula,
   if (!is.null(variable.names)) {
     colnames(ans$beta) <- variable.names
   }
+
+  ## Model diagnostics
+  n <- length(y)
+  ans$log.likelihood <- -0.5 * n * log(2 * pi) - n * log(ans$sigma) -
+      0.5 * ans$sse / ans$sigma^2
+  sdy <- sd(y, na.rm = TRUE)
+  ans$null.log.likelihood <- -0.5 * n * log(2 * pi) - n * log(sdy) -
+      0.5 * (n - 1)
   ans$prior <- prior
 
   ## The stuff below will be needed by predict.lm.spike.
   ans$contrasts <- attr(x, "contrasts")
-  ans$xlevels <- .getXlevels(mt, mf)
-  ans$call <- cl
-  ans$terms <- mt
-  ans$sample.sd <- sd(y)
+  ans$xlevels <- .getXlevels(model.terms, frame)
+  ans$call <- function.call
+  ans$terms <- model.terms
+  ans$sample.sd <- sdy
+  ans$sample.size <- n
 
-  class(ans) <- "lm.spike"
+  ## Methods that work for all glm model families rely on objects
+  ## being of class glm.spike.  Unlike the base R stats package,
+  ## lm.spike objects also inherit from glm.spike.
+  class(ans) <- c("lm.spike", "glm.spike")
   return(ans)
 }
 
 ##----------------------------------------------------------------------
 plot.lm.spike <- function(
     x,
-    y = c("coefficients", "size"),
+    y = c("coefficients", "size", "help"),
     ...) {
   ## S3 method for plotting lm.spike objects.
   y <- match.arg(y)
@@ -155,6 +168,8 @@ plot.lm.spike <- function(
     return(PlotMarginalInclusionProbabilities(x$beta, ...))
   } else if (y == "size") {
     return(PlotModelSize(x$beta, ...))
+  } else if (y == "help") {
+    help("plot.lm.spike", package = "BoomSpikeSlab", help_type = "html")
   } else {
     stop("unknown option", y, " in plot.lm.spike")
   }
@@ -205,7 +220,7 @@ PlotMarginalInclusionProbabilities <- function(
   if (burn > 0) {
     beta <- beta[-(1:burn), , drop = FALSE]
   }
-  inclusion.prob <- colMeans(beta!=0)
+  inclusion.prob <- colMeans(beta != 0)
   index <- order(inclusion.prob)
   beta <- beta[, index, drop = FALSE]
   inclusion.prob <- inclusion.prob[index]
@@ -254,10 +269,11 @@ PlotMarginalInclusionProbabilities <- function(
                         )
   } else {
     bar.plot <-
-      plot(1, 1,
-           axes = F, type = "n",
-           main = paste("No variables exceeded the inclusion ",
-             "probability threshold of", inclusion.threshold))
+        plot(1, 1,
+             axes = F, type = "n",
+             main = paste("No variables exceeded the inclusion ",
+                 "probability threshold of",
+                 inclusion.threshold))
   }
   ans <- list(barplot = bar.plot,
               inclusion.prob = inclusion.prob,
@@ -288,7 +304,7 @@ PlotModelSize <- function(
   if (burn > 0) {
     beta <- beta[-(1:burn), , drop = FALSE]
   }
-  size <- rowSums(beta!=0)
+  size <- rowSums(beta != 0)
   hist(size, xlab = xlab, ...)
   return(invisible(size))
 }
@@ -317,7 +333,7 @@ SummarizeSpikeSlabCoefficients <- function(beta, burn = 0, order = TRUE) {
   inclusion.prob <- colMeans(beta != 0)
   if (order) {
     index <- rev(order(inclusion.prob))
-    beta <- beta[, index , drop = FALSE]
+    beta <- beta[, index, drop = FALSE]
     inclusion.prob <- inclusion.prob[index]
   }
 
@@ -372,10 +388,12 @@ summary.lm.spike <- function(object, burn = 0, order = TRUE, ...) {
   if (burn > 0) {
     sigma <- sigma[-(1:burn)]
   }
+  rsquare.distribution <- 1 - sigma^2 / object$sample.sd^2
   ans <- list(coefficients =
               SummarizeSpikeSlabCoefficients(object$beta, burn, order),
               residual.sd = summary(sigma),
-              rsquare = summary(1 - sigma^2 / object$sample.sd^2))
+              rsquare = summary(rsquare.distribution),
+              rsquare.distribution = rsquare.distribution)
   class(ans) <- "summary.lm.spike"
   return(ans)
 }
@@ -411,48 +429,13 @@ predict.lm.spike <- function(object, newdata, burn = 0,
   ##   burn: The number of MCMC iterations in 'object' that should be
   ##     discarded.  If burn < 0 then all iterations are kept.
   ##   na.action: what to do about NA's.
-  ##   ...:  unused, but present for compatibility with predict().
+  ##   ...: extra aguments ultimately passed to model.matrix (in the
+  ##     event that newdata is a data frame)
   ## Returns:
-  ##   A matrix of predictions, with each row corresponding to a row
-  ##   in newdata, and each column to an MCMC iteration.
-  beta.dimension <- ncol(object$beta)
-  if (is.data.frame(newdata)) {
-    tt <- terms(object)
-    Terms <- delete.response(tt)
-    m <- model.frame(Terms, newdata, na.action = na.action,
-                     xlev = object$xlevels)
-    if (!is.null(cl <- attr(Terms, "dataClasses"))) .checkMFClasses(cl, m)
-    X <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
-
-    if (nrow(X) != nrow(newdata)) {
-      warning("Some entries in newdata have missing values, and will",
-                   "be omitted from the prediction.")
-    }
-  } else if (is.matrix(newdata)) {
-    X <- newdata
-    if (ncol(X) == beta.dimension - 1) {
-      if (attributes(object$terms)$intercept) {
-        X <- cbind(1, X)
-        warning("Implicit intercept added to newdata.")
-      }
-    }
-  } else if (is.vector(newdata) && beta.dimension == 2) {
-    if (attributes(object$terms)$intercept) {
-      X <- cbind(1, newdata)
-    }
-  } else if (is.vector(newdata) && beta.dimension == 1) {
-    X <- matrix(newdata, ncol=1)
-  } else {
-    stop("Error in predict.lm.spike:  newdata must be a matrix,",
-         "or a data.frame,",
-         "unless dim(beta) <= 2, in which case it can be a vector")
-  }
-
-  if (ncol(X) != beta.dimension) {
-    stop("The number of coefficients does not match the number",
-         "of predictors in lm.spike")
-  }
-
+  ## A matrix of predictions, with each row corresponding to a row
+  ## in newdata, and each column to an MCMC iteration.
+  predictor.matrix <- GetPredictorMatrix(object, newdata, na.action =
+                                         na.action, ...)
   beta <- object$beta
   sigma <- object$sigma
   if (burn > 0) {
@@ -460,12 +443,12 @@ predict.lm.spike <- function(object, newdata, burn = 0,
     sigma <- sigma[-(1:burn)]
   }
 
-  eta <- X %*% t(beta)
+  eta <- predictor.matrix %*% t(beta)
 
   ## eta is the [n x niter] matrix of predicted values
   y.new <- matrix(rnorm(length(eta),
                         eta,
-                        rep(sigma, each = nrow(X))),
-                  nrow = nrow(X))
+                        rep(sigma, each = nrow(predictor.matrix))),
+                  nrow = nrow(predictor.matrix))
   return(y.new)
 }

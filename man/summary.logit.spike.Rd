@@ -19,6 +19,7 @@
         cutpoint.scale = c("probability", "logit"),
         cutpoint.basis = c("sample.size", "equal.range"),
         number.of.buckets = 10,
+        coefficients = TRUE,
         ...)
 }
 \arguments{
@@ -48,6 +49,10 @@
 
   \item{number.of.buckets}{The number of buckets to use in the
     comparison of predicted to actual probabilities.}
+
+  \item{coefficients}{Logical value indicating whether the coefficient
+    summary should be included in the output.  It can be useful to
+    suppress the coefficients if there are many of them.}
 
   \item{\dots}{
     Unused.  Present for compatibility with generic summary().

@@ -111,8 +111,15 @@ poisson.spike <- function(
     }
   }
 
-  ans <- .poisson.spike.fit(x, y, exposure, prior, niter, ping,
-                            nthreads, beta0, seed)
+  ans <- .poisson.spike.fit(x = x,
+                            y = y,
+                            exposure = exposure,
+                            prior = prior,
+                            niter = niter,
+                            ping = ping,
+                            nthreads = nthreads,
+                            beta0 = beta0,
+                            seed = seed)
 
   ## The stuff below will be needed by predict.poisson.spike.
   ans$contrasts <- attr(x, "contrasts")
@@ -125,7 +132,7 @@ poisson.spike <- function(
   }
 
   ## Make the answer a class, so that the right methods will be used.
-  class(ans) <- c("poisson.spike", "lm.spike")
+  class(ans) <- c("poisson.spike", "glm.spike")
   return(ans)
 }
 
@@ -151,50 +158,12 @@ predict.poisson.spike <- function(object, newdata, burn = 0,
   ##   in newdata, and each column to an MCMC iteration.
 
   type <- match.arg(type)
-
-  beta.dimension <- ncol(object$beta)
-  if (is.data.frame(newdata)) {
-    tt <- terms(object)
-    Terms <- delete.response(tt)
-    m <- model.frame(Terms, newdata, na.action = na.action,
-                     xlev = object$xlevels)
-    if (!is.null(cl <- attr(Terms, "dataClasses"))) .checkMFClasses(cl, m)
-    X <- model.matrix(Terms, m, contrasts.arg = object$contrasts)
-
-    if (nrow(X) != nrow(newdata)) {
-      warning("Some entries in newdata have missing values, and will",
-              "be omitted from the prediction.")
-    }
-  } else if (is.matrix(newdata)) {
-    X <- newdata
-    if (ncol(X) == beta.dimension - 1) {
-      if (attributes(object$terms)$intercept) {
-        X <- cbind(1, X)
-        warning("Implicit intercept added to newdata.")
-      }
-    }
-  } else if (is.vector(newdata) && beta.dimension == 2) {
-    if (attributes(object$terms)$intercept) {
-      X <- cbind(1, newdata)
-    }
-  } else if (is.vector(newdata) && beta.dimension == 1) {
-    X <- matrix(newdata, ncol=1)
-  } else {
-    stop("Error in predict.poisson.spike:  newdata must be a matrix,",
-         "or a data.frame,",
-         "unless dim(beta) <= 2, in which case it can be a vector")
-  }
-
-  if (ncol(X) != beta.dimension) {
-    stop("The number of coefficients does not match the number",
-         "of predictors in poisson.spike")
-  }
+  predictors <- GetPredictorMatrix(object, newdata, na.action = na.action, ...)
   beta <- object$beta
   if (burn > 0) {
     beta <- beta[-(1:burn), , drop = FALSE]
   }
-
-  eta <- X %*% t(beta)
+  eta <- predictors %*% t(beta)
   if (type == "log" || type == "link") return(eta)
   if (type == "mean" || type == "response") return(exp(eta))
 }
@@ -256,4 +225,18 @@ predict.poisson.spike <- function(object, newdata, burn = 0,
   ans$prior <- prior
   class(ans) <- c("poisson.spike", "glm.spike", "lm.spike")
   return(ans)
+}
+
+plot.poisson.spike <- function(
+    x,
+    y = c("coefficients", "size", "help"),
+    ...) {
+  y <- match.arg(y)
+  if (y == "coefficients") {
+    return(PlotMarginalInclusionProbabilities(x$beta, ...))
+  } else if (y == "size") {
+    return(PlotModelSize(x$beta, ...))
+  } else if (y == "help") {
+    help("plot.poisson.spike", package = "BoomSpikeSlab", help_type = "html")
+  }
 }
