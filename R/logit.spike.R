@@ -75,7 +75,7 @@ logit.spike <- function(formula,
   ##   prior:  The prior that was used to fit the model.
   ##  In addition, the returned object contains sufficient details for
   ##  the call to model.matrix in the predict.lm.spike method.
-
+  has.data <- !missing(data)
   cl <- match.call()
   mf <- match.call(expand.dots = FALSE)
   m <- match(c("formula", "data", "subset", "na.action"), names(mf), 0L)
@@ -201,6 +201,19 @@ logit.spike <- function(formula,
 
   colnames(ans$beta) <- colnames(design)
 
+  if (has.data) {
+    ## Note, if a data.frame was passed as an argument to this function
+    ## then saving the data frame will be cheaper than saving the
+    ## model.frame.
+    ans$training.data <- data
+  } else {
+    ## If the model was called with a formula referring to objects in
+    ## another environment, then saving the model frame will capture
+    ## these variables so they can be used to recreate the design
+    ## matrix.
+    ans$training.data <- mf
+  }
+
   ## Make the answer a class, so that the right methods will be used.
   class(ans) <- c("logit.spike", "lm.spike", "glm.spike")
   return(ans)
@@ -239,7 +252,9 @@ predict.logit.spike <- function(object, newdata, burn = 0,
 
 plot.logit.spike <- function(
     x,
-    y = c("coefficients", "fit", "residuals", "size", "help"),
+    y = c("inclusion", "coefficients", "scaled.coefficients", "fit",
+        "residuals", "size", "help"),
+    burn = SuggestBurnLogLikelihood(x$log.likelihood),
     ...) {
   ## S3 method for plotting logit.spike objects.
   ## Args:
@@ -248,14 +263,26 @@ plot.logit.spike <- function(
   ##   ...: Additional named arguments passed to the functions that
   ##     actually do the plotting.
   y <- match.arg(y)
-  if (y == "coefficients") {
-    PlotMarginalInclusionProbabilities(x$beta, ...)
+  if (y == "inclusion") {
+    PlotMarginalInclusionProbabilities(x$beta,
+                                       burn = burn,
+                                       ...)
+  } else if (y == "coefficients") {
+    PlotLmSpikeCoefficients(x$beta,
+                            burn = burn,
+                            ...)
+  } else if (y == "scaled.coefficients") {
+    scale.factors <- apply(model.matrix(x), 2, sd)
+    PlotLmSpikeCoefficients(x$beta,
+                            burn = burn,
+                            scale.factors = scale.factors,
+                            ...)
   } else if (y == "fit") {
-    PlotLogitSpikeFitSummary(x, ...)
+    PlotLogitSpikeFitSummary(x, burn = burn, ...)
   } else if (y == "residuals") {
     PlotLogitSpikeResiduals(x, ...)
   } else if (y == "size") {
-    PlotModelSize(x$beta, ...)
+    PlotModelSize(x$beta, burn = burn, ...)
   } else if (y == "help") {
     help("plot.logit.spike", package = "BoomSpikeSlab", help_type = "html")
   } else {

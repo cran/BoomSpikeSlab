@@ -180,8 +180,8 @@ logit.spike(formula,
 
 \examples{
 if (requireNamespace("MASS")) {
-  data(Pima.tr)
-  data(Pima.te)
+  data(Pima.tr, package = "MASS")
+  data(Pima.te, package = "MASS")
   pima <- rbind(Pima.tr, Pima.te)
   model <- logit.spike(type == "Yes" ~ ., data = pima, niter = 500)
   plot(model)

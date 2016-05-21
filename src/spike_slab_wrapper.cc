@@ -8,7 +8,9 @@
 
 #include "Models/Glm/PosteriorSamplers/BregVsSampler.hpp"
 #include "Models/Glm/PosteriorSamplers/SpikeSlabDaRegressionSampler.hpp"
+#include "Models/Glm/PosteriorSamplers/TRegressionSpikeSlabSampler.hpp"
 #include "Models/Glm/RegressionModel.hpp"
+#include "Models/Glm/TRegression.hpp"
 
 #include "Models/ChisqModel.hpp"
 #include "Models/IndependentMvnModelGivenScalarSigma.hpp"
@@ -25,8 +27,8 @@
 #include "cpputil/Ptr.hpp"
 
 namespace {
-  using namespace BOOM;  // NOLINT
-  using namespace BOOM::RInterface;  // NOLINT
+  using namespace BOOM;
+  using namespace BOOM::RInterface;
 
   class SseCallback
       : public BOOM::ScalarIoCallback {
@@ -40,23 +42,46 @@ namespace {
     RegressionModel *model_;
   };
 
-  Ptr<RegressionModel> SpecifyRegressionModel(
+  template <class MODEL>
+  void configure_io_manager(Ptr<MODEL> model,
+                            BOOM::RListIoManager *io_manager) {
+    io_manager->add_list_element(
+        new GlmCoefsListElement(model->coef_prm(), "beta"));
+    io_manager->add_list_element(
+        new StandardDeviationListElement(model->Sigsq_prm(), "sigma"));
+  }
+
+  template <class MODEL>
+  void initialize_model(Ptr<MODEL> model,
+                        const Matrix &design_matrix,
+                        const Vector &response_vector) {
+    size_t n = design_matrix.nrow();
+    for (size_t i = 0; i < n; ++i) {
+      model->add_data(Ptr<RegressionData>(
+          new RegressionData(response_vector[i], design_matrix.row(i))));
+    }
+    model->coef().drop_all();
+    model->coef().add(0);  // start with the intercept
+  }
+
+  template <class SAMPLER, class PRIOR>
+  void initialize_sampler(Ptr<SAMPLER> sampler, const PRIOR &prior) {
+    sampler->set_sigma_upper_limit(prior.sigma_upper_limit());
+    if (prior.max_flips() > 0) {
+      sampler->limit_model_selection(prior.max_flips());
+    }
+  }
+
+  Ptr<GlmModel> SpecifyRegressionModel(
       SEXP r_design_matrix,
       SEXP r_response_vector,
       SEXP r_spike_slab_prior,
       SEXP r_bma_method,
       SEXP r_oda_options,
       BOOM::RListIoManager *io_manager) {
-    Vector y(ToBoomVector(r_response_vector));
-    Matrix X(ToBoomMatrix(r_design_matrix));
-    Ptr<RegressionModel> model(new RegressionModel(X.ncol()));
-    int n = X.nrow();
-    for (int i = 0; i < n; ++i) {
-      model->add_data(Ptr<RegressionData>(new RegressionData(y[i], X.row(i))));
-    }
-
-    model->coef().drop_all();
-    model->coef().add(0);  // start with the intercept
+    Matrix design_matrix(ToBoomMatrix(r_design_matrix));
+    Ptr<RegressionModel> model(new RegressionModel(design_matrix.ncol()));
+    initialize_model(model, design_matrix, ToBoomVector(r_response_vector));
 
     std::string bma_method = ToString(r_bma_method);
     if (bma_method == "SSVS") {
@@ -67,10 +92,7 @@ namespace {
           prior.slab(),
           prior.siginv_prior(),
           prior.spike());
-      ssvs_sampler->set_sigma_upper_limit(prior.sigma_upper_limit());
-      if (prior.max_flips() > 0) {
-        ssvs_sampler->limit_model_selection(prior.max_flips());
-      }
+      initialize_sampler(ssvs_sampler, prior);
       model->set_method(ssvs_sampler);
       BOOM::spikeslab::InitializeCoefficients(
           model->Beta(),
@@ -97,7 +119,7 @@ namespace {
               prior.prior_inclusion_probabilities(),
               eigenvalue_fudge_factor,
               fallback_probability);
-      oda_sampler->set_sigma_upper_limit(prior.sigma_upper_limit());
+      initialize_sampler(oda_sampler, prior);
       model->set_method(oda_sampler);
       BOOM::spikeslab::InitializeCoefficients(
           model->Beta(),
@@ -105,15 +127,37 @@ namespace {
           model,
           oda_sampler);
     }
-    io_manager->add_list_element(
-        new GlmCoefsListElement(model->coef_prm(), "beta"));
-    io_manager->add_list_element(
-        new StandardDeviationListElement(model->Sigsq_prm(), "sigma"));
+    configure_io_manager(model, io_manager);
     io_manager->add_list_element(
         new NativeUnivariateListElement(
             new SseCallback(model.get()), "sse", nullptr));
     return(model);
   }
+
+  Ptr<TRegressionModel> SpecifyStudentRegressionModel(
+      SEXP r_design_matrix,
+      SEXP r_response_vector,
+      SEXP r_spike_slab_prior,
+      BOOM::RListIoManager *io_manager) {
+    Matrix design_matrix(ToBoomMatrix(r_design_matrix));
+    NEW(TRegressionModel, model)(design_matrix.ncol());
+    initialize_model(model, design_matrix, ToBoomVector(r_response_vector));
+    RInterface::StudentRegressionConjugateSpikeSlabPrior prior(
+        r_spike_slab_prior, model->Sigsq_prm());
+    NEW(TRegressionSpikeSlabSampler, sampler)(
+        model.get(),
+        prior.slab(),
+        prior.spike(),
+        prior.siginv_prior(),
+        prior.degrees_of_freedom_prior());
+    initialize_sampler(sampler, prior);
+    model->set_method(sampler);
+    configure_io_manager(model, io_manager);
+    io_manager->add_list_element(
+        new UnivariateListElement(model->Nu_prm(), "tail.thickness"));
+    return model;
+  }
+
 }  // namespace
 
 extern "C" {
@@ -124,38 +168,47 @@ extern "C" {
   SEXP do_spike_slab(SEXP r_design_matrix,
                                        SEXP r_response_vector,
                                        SEXP r_spike_slab_prior,
+                                       SEXP r_error_distribution,
                                        SEXP r_niter,
                                        SEXP r_ping,
                                        SEXP r_bma_method,
                                        SEXP r_oda_options,
                                        SEXP r_seed) {
     RErrorReporter error_reporter;
+    RMemoryProtector protector;
     try {
       seed_rng_from_R(r_seed);
       RListIoManager io_manager;
-      Ptr<RegressionModel> model = SpecifyRegressionModel(
-          r_design_matrix,
-          r_response_vector,
-          r_spike_slab_prior,
-          r_bma_method,
-          r_oda_options,
-          &io_manager);
+      Ptr<Model> model;
+      std::string error_distribution = ToString(r_error_distribution);
+      if (error_distribution == "gaussian") {
+        model = SpecifyRegressionModel(
+            r_design_matrix,
+            r_response_vector,
+            r_spike_slab_prior,
+            r_bma_method,
+            r_oda_options,
+            &io_manager);
+      } else if (error_distribution == "student") {
+        model = SpecifyStudentRegressionModel(
+            r_design_matrix,
+            r_response_vector,
+            r_spike_slab_prior,
+            &io_manager);
+      }
 
       int niter = Rf_asInteger(r_niter);
       int ping = Rf_asInteger(r_ping);
-      SEXP ans;
-      PROTECT(ans = io_manager.prepare_to_write(niter));
+      SEXP ans = protector.protect(io_manager.prepare_to_write(niter));
       for (int i = 0; i < niter; ++i) {
         if (RCheckInterrupt()) {
           error_reporter.SetError("Canceled by user.");
-          UNPROTECT(1);
           return R_NilValue;
         }
         print_R_timestamp(i, ping);
         model->sample_posterior();
         io_manager.write();
       }
-      UNPROTECT(1);
       return ans;
     } catch(std::exception &e) {
       handle_exception(e);

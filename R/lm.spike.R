@@ -3,6 +3,7 @@ lm.spike <- function(formula,
                      data,
                      subset,
                      prior = NULL,
+                     error.distribution = c("gaussian", "student"),
                      contrasts = NULL,
                      drop.unused.levels = TRUE,
                      bma.method = c("SSVS", "ODA"),
@@ -30,6 +31,9 @@ lm.spike <- function(formula,
   ##     IndependentSpikeSlabPrior can be used.  (A SpikeSlabPrior will
   ##     be used as the default).  If 'bma.method' is ODA then an
   ##     IndependentSpikeSlabPrior is required.
+  ##   error.distribution: Specify either Gaussian or Student T
+  ##     errors.  If the error distribution is student then the prior
+  ##     must be a StudentSpikeSlabPrior.
   ##   contrasts: An optional list. See the 'contrasts.arg' of
   ##     ‘model.matrix.default’.
   ##   drop.unused.levels: logical.  Should unobserved factor levels
@@ -76,6 +80,7 @@ lm.spike <- function(formula,
 
   function.call <- match.call()
   frame <- match.call(expand.dots = FALSE)
+  has.data <- !missing(data)
   name.positions <- match(c("formula", "data", "subset", "na.action"),
                           names(frame), 0L)
   frame <- frame[c(1L, name.positions)]
@@ -87,14 +92,22 @@ lm.spike <- function(formula,
 
   x <- model.matrix(model.terms, frame, contrasts)
   bma.method <- match.arg(bma.method)
+  error.distribution <- match.arg(error.distribution)
   if (is.null(prior)) {
-    if (bma.method == "SSVS") {
-      prior <- SpikeSlabPrior(x, y, ...)
-    } else if (bma.method == "ODA") {
-      prior <- IndependentSpikeSlabPrior(x, y, ...)
+    if (error.distribution == "gaussian") {
+      if (bma.method == "SSVS") {
+        prior <- SpikeSlabPrior(x, y, ...)
+      } else if (bma.method == "ODA") {
+        prior <- IndependentSpikeSlabPrior(x, y, ...)
+      }
+    } else {
+      prior <- StudentSpikeSlabPrior(x, y, ...)
     }
   }
   stopifnot(inherits(prior, "SpikeSlabPriorBase"))
+  if (error.distribution == "student") {
+    stopifnot(inherits(prior, "StudentSpikeSlabPrior"))
+  }
   if (bma.method == "ODA") {
     stopifnot(inherits(prior, "IndependentSpikeSlabPrior"))
     stopifnot(is.list(oda.options))
@@ -123,6 +136,7 @@ lm.spike <- function(formula,
                x,
                y,
                prior,
+               error.distribution,
                as.integer(niter),
                as.integer(ping),
                bma.method,
@@ -135,12 +149,9 @@ lm.spike <- function(formula,
 
   ## Model diagnostics
   n <- length(y)
-  ans$log.likelihood <- -0.5 * n * log(2 * pi) - n * log(ans$sigma) -
-      0.5 * ans$sse / ans$sigma^2
   sdy <- sd(y, na.rm = TRUE)
-  ans$null.log.likelihood <- -0.5 * n * log(2 * pi) - n * log(sdy) -
-      0.5 * (n - 1)
   ans$prior <- prior
+  ans$error.distribution <- error.distribution
 
   ## The stuff below will be needed by predict.lm.spike.
   ans$contrasts <- attr(x, "contrasts")
@@ -149,6 +160,42 @@ lm.spike <- function(formula,
   ans$terms <- model.terms
   ans$sample.sd <- sdy
   ans$sample.size <- n
+
+  if (error.distribution == "gaussian") {
+    ans$log.likelihood <- -0.5 * n * log(2 * pi) - n * log(ans$sigma) -
+        0.5 * ans$sse / ans$sigma^2
+    ans$null.log.likelihood <- -0.5 * n * log(2 * pi) - n * log(sdy) -
+        0.5 * (n - 1)
+  } else if (error.distribution == "student") {
+    errors <- matrix(rep(y, times = niter), ncol = niter) - x %*% t(ans$beta)
+    errors <- errors / rep(ans$sigma, each = n)
+    ans$log.likelihood <-
+      colSums(dt(errors,
+                 df = rep(ans$tail.thickness, each = n),
+                 log = TRUE))
+    ## The null log likelihood is not quite right.  We really should
+    ## be refitting the model using a regression with no predictors,
+    ## but that is potentially expensive, and this will get us in the
+    ## ballpark.
+    ans$null.log.likelihood <- sum(
+        dt(y - mean(y) / sdy,
+           df = median(ans$tail.thickness),
+           log = TRUE))
+  }
+
+  ans$response <- y
+  if (has.data) {
+    ## Note, if a data.frame was passed as an argument to this function
+    ## then saving the data frame will be cheaper than saving the
+    ## model.frame.
+    ans$training.data <- data
+  } else {
+    ## If the model was called with a formula referring to objects in
+    ## another environment, then saving the model frame will capture
+    ## these variables so they can be used to recreate the design
+    ## matrix.
+    ans$training.data <- frame
+  }
 
   ## Methods that work for all glm model families rely on objects
   ## being of class glm.spike.  Unlike the base R stats package,
@@ -160,14 +207,26 @@ lm.spike <- function(formula,
 ##----------------------------------------------------------------------
 plot.lm.spike <- function(
     x,
-    y = c("coefficients", "size", "help"),
+    y = c("inclusion", "coefficients", "scaled.coefficients",
+        "residuals", "size", "help"),
+    burn = SuggestBurnLogLikelihood(x$log.likelihood),
     ...) {
   ## S3 method for plotting lm.spike objects.
   y <- match.arg(y)
-  if (y == "coefficients") {
-    return(PlotMarginalInclusionProbabilities(x$beta, ...))
+  if (y == "inclusion") {
+    return(PlotMarginalInclusionProbabilities(
+        x$beta, burn = burn, ...))
+  } else if (y == "coefficients") {
+    return(PlotLmSpikeCoefficients(
+        x$beta, burn = burn, ...))
+  } else if (y == "scaled.coefficients") {
+    scale.factors = apply(model.matrix(x), 2, sd)
+    return(PlotLmSpikeCoefficients(
+        x$beta, burn = burn, scale.factors = scale.factors, ...))
   } else if (y == "size") {
-    return(PlotModelSize(x$beta, ...))
+    return(PlotModelSize(x$beta, burn = burn, ...))
+  } else if (y == "residuals") {
+    PlotLmSpikeResiduals(x, burn = burn, ...)
   } else if (y == "help") {
     help("plot.lm.spike", package = "BoomSpikeSlab", help_type = "html")
   } else {
@@ -282,6 +341,206 @@ PlotMarginalInclusionProbabilities <- function(
   return(invisible(ans))
 }
 
+##----------------------------------------------------------------------
+residuals.lm.spike <- function(
+    object,
+    burn = SuggestBurnLogLikelihood(object$log.likelihood),
+    mean.only = FALSE,
+    ...) {
+  ## Args:
+  ##   object:  An lm.spike object.
+  ##   burn: Number of MCMC iterations to discard.  If burn <= 0 then
+  ##     no iterations are discarded.
+  ##   mean.only: Logical.  If TRUE then the posterior mean of each
+  ##     residual is returned.  If FALSE then the full posterior
+  ##     distribution of residuals is returned.
+  ##   ...: not used.  Present only to comply with the signature of
+  ##     the residuals() generic function.
+  ##
+  ## Returns:
+  ##   The posterior distribution (or posterior mean) of residuals
+  ##   from the model object.  If mean.only is TRUE then the return
+  ##   value is the vector of residuals, otherwise the return value is
+  ##   a matrix, with rows corresponding to MCMC iterations, and
+  ##   columns to individual observations.
+  ##
+  ## Details:
+  ##   This function must be called in the same frame as the one used
+  ##   to create the lm.spike model object, and the data objects used
+  ##   to fit the model must not have changed between the call and the
+  ##   model fit.  This is because lm.spike does not store the model
+  ##   matrix as part of the returned object, so it will be
+  ##   reconstructed here.
+  predictors <- model.matrix(object)
+  predictions <- predictors %*% t(object$beta)
+  residuals <- t(object$response - predictions)
+  if (mean.only) {
+    return(colMeans(residuals))
+  } else {
+    return(residuals)
+  }
+}
+
+##----------------------------------------------------------------------
+PlotLmSpikeCoefficients <- function(beta,
+                                    burn = 0,
+                                    inclusion.threshold = 0,
+                                    scale.factors = NULL,
+                                    number.of.variables = NULL,
+                                    ...) {
+  ## Produces boxplots showing the marginal distribution of the coefficients.
+  ##
+  ## Args:
+  ##   beta: A matrix of model coefficients.  Each row represents an
+  ##     MCMC draw.  Each column represents a coefficient for a
+  ##     variable.
+  ##   burn: Number of MCMC iterations to discard.  If burn <= 0 then
+  ##     no iterations are discarded.
+  ##   inclusion.threshold: Only plot coefficients with posterior
+  ##     inclusion probabilites exceeding this value.
+  ##   scale.factors: If non-null then a vector of scale factors with which to
+  ##     scale the columns of beta.  A NULL value is ignored.
+  ##   number.of.variables: If non-null then this is an upper bound on
+  ##     the number of coefficients to show.  Coefficients are ordered
+  ##     by their posterior inclusion probabilites.
+  ##
+  ## Returns:
+  ##   The return value of the call to boxplot.
+  ##
+  ## Details:
+  ##   Produces a set of boxplots on the current graphics device.  The
+  ##   boxes represent the marginal posterior distribution of the
+  ##   regression coefficients beta, ordered by their posterior
+  ##   inclusion probabilites.  The widths of the boxes and sizes of
+  ##   the points are proportional to the marginal inclusion
+  ##   probabilites.
+  if (burn > 0) {
+    beta <- beta[-(1:burn), , drop = FALSE]
+  }
+  if (!is.null(scale.factors)) {
+    stopifnot(is.numeric(scale.factors),
+              length(scale.factors) == ncol(beta))
+    if (any(scale.factors < 0)) {
+      warning("Negative scale factors.")
+    }
+    beta <- t(t(beta) * scale.factors)
+  }
+
+  inclusion.prob <- colMeans(beta != 0)
+  if (inclusion.threshold < 0) {
+    inclusion.threshold <- 0
+  }
+  included <- inclusion.prob > inclusion.threshold
+
+  omai <- par("mai")
+  variable.names <- colnames(beta)
+  omai[2] <- max(strwidth(variable.names, units = "inches")) + .5
+  oldpar <- par(mai = omai)
+  on.exit(par(oldpar))
+
+  beta <- beta[, included]
+  inclusion.prob <- inclusion.prob[included]
+
+  if (!is.null(number.of.variables)) {
+    stopifnot(is.numeric(number.of.variables),
+              length(number.of.variables) == 1,
+              number.of.variables > 0)
+    if (ncol(beta) > number.of.variables) {
+      beta <- beta[, 1:number.of.variables]
+      inclusion.prob <- inclusion.prob[1:number.of.variables]
+    }
+  }
+
+  ord <- order(inclusion.prob)
+  beta <- beta[, ord]
+  inclusion.prob <- inclusion.prob[ord]
+
+  return(invisible(boxplot(beta,
+          width = inclusion.prob,
+          horizontal = TRUE,
+          las = 1,
+          cex = inclusion.prob,
+          ...)))
+}
+
+##----------------------------------------------------------------------
+PlotLmSpikeResiduals <- function(
+    object,
+    burn = SuggestBurnLogLikelihood(object$log.likelihood),
+    ...) {
+  ## Args:
+  ##   object: An lm.spike model object.
+  ##   burn: Number of MCMC iterations to discard.  If burn <= 0 then
+  ##     no iterations are discarded.
+  ##   ...: Extra arguments passed to 'plot'.
+  ##
+  ## Returns:
+  ##   NULL
+  ##
+  ## Details:
+  ##   Plots residuals vs predicted values, after discarding the
+  ##   requested burn-in.  Residuals are posterior mean residuals, and
+  ##   predicted values are posterior mean predictions.
+  predictors <- model.matrix(object)
+  beta <- object$beta
+  if (burn > 0) {
+    beta <- beta[-(1:burn), , drop = FALSE]
+  }
+  predictions <- predictors %*% t(beta)
+  residuals <- rowMeans(object$response - predictions)
+  predictions <- rowMeans(predictions)
+  plot(predictions,
+       residuals,
+       xlab = "Posterior mean predictions",
+       ylab = "Posterior mean residuals",
+       ...)
+  return(NULL)
+}
+
+##----------------------------------------------------------------------
+## TODO(stevescott): This code is experimental.  Make a decision to
+## keep it or cut it.
+## PlotLmSpikeFitSummary <- function(
+##     model,
+##     burn = SuggestBurnLogLikelihood(model$log.likelihood),
+##     cutpoint.basis = c("sample.size", "equal.range"),
+##     number.of.buckets = 10,
+##     ...) {
+##   stopifnot(inherits(model, "lm.spike"))
+##   cutpoint.basis <- match.arg(cutpoint.basis)
+##   fitted <- predict(model, mean.only = TRUE, burn = burn)
+##   if (cutpoint.basis == "sample.size") {
+##     cutpoints <- quantile(fitted, (0:number.of.buckets) / number.of.buckets)
+##   } else if (cutpoint.basis == "equal.range") {
+##     fitted.range <- range(fitted, na.rm = TRUE)
+##     cutpoints <- seq(min(fitted.range),
+##                      max(fitted.range),
+##                      len = number.of.buckets + 1)
+##   }
+##   cutpoints <- unique(cutpoints)
+##   bucket.indicators <- cut(fitted, cutpoints)
+
+##   resids <- residuals(model, mean.only = TRUE, burn = burn)
+##   if (is.matrix(resids)) {
+##     buckets <- list()
+##     unique.buckets <- sort(unique(bucket.indicators))
+##     for (bucket in unique.buckets) {
+##       buckets[[bucket]] <- unlist(resids[, bucket.indicators == bucket])
+##     }
+##   } else {
+##     buckets <- split(resids, bucket.indicators)
+##   }
+
+##   cutpoint.widths <- diff(cutpoints)
+##   cutpoint.means <- (head(cutpoints, -1) + tail(cutpoints, -1)) / 2
+##   plot(fitted, fitted, type = "n", ylim = range(unlist(buckets), na.rm = TRUE),
+##        xlab = "predicted", ylab = "residuals")
+##   boxplot(buckets, add = TRUE, at = cutpoint.means,
+##           width = cutpoint.widths,
+##           axes = FALSE)
+##   abline(v = cutpoints, lty = 3)
+##   abline(h = 0, lwd = 2)
+## }
 ##----------------------------------------------------------------------
 PlotModelSize <- function(
     beta,
@@ -412,43 +671,78 @@ print.summary.lm.spike <- function(x, ...) {
 }
 
 ##----------------------------------------------------------------------
-predict.lm.spike <- function(object, newdata, burn = 0,
-                             na.action = na.pass, ...) {
+predict.lm.spike <- function(object,
+                             newdata = NULL,
+                             burn = 0,
+                             na.action = na.pass,
+                             mean.only = FALSE,
+                             ...) {
   ## Prediction method for lm.spike
   ## Args:
   ##   object: object of class "lm.spike" returned from the lm.spike
   ##     function
-  ##   newdata: A data frame, matrix, or vector containing the
-  ##     predictors needed to make the prediction.  If 'newdata' is a
-  ##     data.frame it must contain variables with the same names as
-  ##     the data frame used to fit 'object'.  If it is a matrix, it
-  ##     must have the same number of columns as object$beta.  (An
-  ##     intercept term will be implicitly added if the number of
-  ##     columns is one too small.)  If the dimension of object$beta
-  ##     is 1 or 2, then
+  ##   newdata: Either NULL, or else a data frame, matrix, or vector
+  ##     containing the predictors needed to make the prediction.  If
+  ##     'newdata' is 'NULL' then the predictors are taken from the
+  ##     training data used to create the model object.  Note that
+  ##     'object' does not store its training data, so the data
+  ##     objects used to fit the model must be present for the
+  ##     training data to be recreated.  If 'newdata' is a data.frame
+  ##     it must contain variables with the same names as the data
+  ##     frame used to fit 'object'.  If it is a matrix, it must have
+  ##     the same number of columns as object$beta.  (An intercept
+  ##     term will be implicitly added if the number of columns is one
+  ##     too small.)  If the dimension of object$beta is 1 or 2, then
+  ##     newdata can be a vector.
   ##   burn: The number of MCMC iterations in 'object' that should be
-  ##     discarded.  If burn < 0 then all iterations are kept.
+  ##     discarded.  If burn <= 0 then all iterations are kept.
   ##   na.action: what to do about NA's.
+  ##   mean.only: Logical.  If TRUE then return the posterior mean of
+  ##     the predictive distribution.  If FALSE then return the entire
+  ##     distribution.
   ##   ...: extra aguments ultimately passed to model.matrix (in the
   ##     event that newdata is a data frame)
   ## Returns:
   ## A matrix of predictions, with each row corresponding to a row
   ## in newdata, and each column to an MCMC iteration.
-  predictor.matrix <- GetPredictorMatrix(object, newdata, na.action =
-                                         na.action, ...)
+
+  if (is.null(newdata)) {
+    predictor.matrix <- model.matrix(object)
+  } else {
+    predictor.matrix <- GetPredictorMatrix(
+        object, newdata, na.action = na.action, ...)
+  }
   beta <- object$beta
   sigma <- object$sigma
+  nu <- object$tail.thickness
+  stopifnot(is.numeric(burn) || length(burn) == 1)
   if (burn > 0) {
     beta <- beta[-(1:burn), , drop = FALSE]
     sigma <- sigma[-(1:burn)]
+    if (!is.null(nu)) {
+      nu <- nu[-(1:burn)]
+    }
   }
 
-  eta <- predictor.matrix %*% t(beta)
-
   ## eta is the [n x niter] matrix of predicted values
-  y.new <- matrix(rnorm(length(eta),
-                        eta,
-                        rep(sigma, each = nrow(predictor.matrix))),
-                  nrow = nrow(predictor.matrix))
-  return(y.new)
+  eta <- predictor.matrix %*% t(beta)
+  if (mean.only) {
+    return(rowMeans(eta))
+  } else {
+    if (is.null(nu)) {
+      ## Handle Gaussian case.
+      y.new <- matrix(rnorm(length(eta),
+                            eta,
+                            rep(sigma, each = nrow(predictor.matrix))),
+                      nrow = nrow(predictor.matrix))
+    } else {
+      ## Handle student T case.
+      y.new <- matrix(rt(length(eta),
+                         rep(nu, each = nrow(predictor.matrix)))
+                      * rep(sigma, each = nrow(predictor.matrix))
+                      + eta,
+                      nrow = nrow(predictor.matrix))
+    }
+    return(y.new)
+  }
 }

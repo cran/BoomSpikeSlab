@@ -12,6 +12,9 @@
   MCMC algorithm for linear regression models with a 'spike-and-slab'
   prior that places some amount of posterior probability at zero for a
   subset of the regression coefficients.
+
+  The model admits either Gaussian or student T errors; the latter are
+  useful in the presence of outliers.
 }
 \usage{
 lm.spike(formula,
@@ -19,6 +22,7 @@ lm.spike(formula,
          data,
          subset,
          prior = NULL,
+         error.distribution = c("gaussian", "student"),
          contrasts = NULL,
          drop.unused.levels = TRUE,
          bma.method = c("SSVS", "ODA"),
@@ -54,6 +58,10 @@ lm.spike(formula,
     \code{\link{SpikeSlabPrior}}.  If \code{prior} is missing then a
     default prior will be used.  See \code{\link{SpikeSlabPrior}}.
   }
+
+  \item{error.distribution}{Specify either Gaussian or Student T
+    errors.  If the error distribution is student then the prior
+    must be a \code{\link{StudentSpikeSlabPrior}}.}
 
   \item{contrasts}{ An optional list. See the \code{contrasts.arg}
     argument of \code{\link{model.matrix.default}}.  }
@@ -177,11 +185,33 @@ lm.spike(formula,
   x <- x[,-1]
   model <- lm.spike(y ~ x, niter=niter)
   plot.ts(model$beta)
-  opar <-  par(ask=TRUE)
-  on.exit(par(opar))
   hist(model$sigma)  ## should be near 8
   plot(model)
   summary(model)
+  plot(model, "residuals")
+
+  ## Now replace the first observation with a big outlier.
+  y[1] <- 50
+  model <- lm.spike(y ~ x, niter = niter)
+  model2 <- lm.spike(y ~ x, niter = niter, error.distribution = "student")
+  pred <- predict(model, newdata = x)
+  pred2 <- predict(model2, newdata = x)
+
+  ## Maximize the plot window before making these box plots.  They show
+  ## the posterior predictive distribution of all 100 data points, so
+  ## make sure your screen is 100 boxes wide!
+  par(mfrow = c(2,1))
+  BoxplotTrue(t(pred), truth = y, ylim = range(pred), pch = ".",
+     main = "Posterior predictive distribution assuming Gaussian errors.")
+  BoxplotTrue(t(pred2), truth = y, ylim  = range(pred), pch = ",",
+     main = "Posterior predictive distribution assuming Student errors.")
+
+  ## The posterior predictive distributions are much tighter in the
+  ## student case than in the Gaussian case, even though the student
+  ## model has heavier tails, because the "sigma" parameter is smaller.
+  par(mfrow = c(1,1))
+  CompareDensities(list(gaussian = model$sigma, student = model2$sigma),
+                        xlab = "sigma")
 }
 \keyword{models}
 \keyword{regression}

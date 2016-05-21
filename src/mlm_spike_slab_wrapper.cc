@@ -137,6 +137,8 @@ extern "C" {
       SEXP r_mh_chunk_size,
       SEXP r_proposal_weights,
       SEXP r_seed) {
+    RErrorReporter error_reporter;
+    RMemoryProtector protector;
     try {
       RInterface::seed_rng_from_R(r_seed);
       RListIoManager io_manager;
@@ -160,22 +162,19 @@ extern "C" {
           specification.second;
       int niter = Rf_asInteger(r_niter);
       int ping = Rf_asInteger(r_ping);
-      SEXP ans;
-      PROTECT(ans = io_manager.prepare_to_write(niter));
+      SEXP ans = protector.protect(io_manager.prepare_to_write(niter));
       for (int i = 0; i < niter; ++i) {
         if (RCheckInterrupt()) {
+          error_reporter.SetError("Canceled by user.");
           return R_NilValue;
         }
         print_R_timestamp(i, ping);
         model->sample_posterior();
         io_manager.write();
       }
-      // ans is unprotected after this step, but not worth protecting,
-      // since the following step is an UNPROTECT anyway.
       ans = appendListElement(ans,
                               ToRMatrix(sampler->timing_report()),
                               "MH.accounting");
-      UNPROTECT(1);
       return ans;
     } catch (std::exception &e) {
       RInterface::handle_exception(e);

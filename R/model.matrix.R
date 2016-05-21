@@ -67,3 +67,23 @@ GetPredictorMatrix <- function(object, newdata, na.action = na.omit, ...) {
   }
   return(X)
 }
+
+model.matrix.glm.spike <- function(object, ...) {
+  ## S3 generic implementing model.matrix for glm.spike objects.
+  ##
+  ## Args:
+  ##   object:  An object of class glm.spike.
+  ##   ...:  Extra arguments passed to model.matrix.default.
+  ##
+  ## Returns:
+  ##   The matrix of predictors used at training time, so long as the
+  ##   original data used to fit the model is available in the frame
+  ##   where this function is called.
+  ##
+  ## Details:
+  ##   glm.spike objects do not store the predictors used to fit the
+  ##   model.  If the training data is modified between when 'object'
+  ##   is fit and when this function is called, the modifications will
+  ##   be reflected in the returned value.
+  return(model.matrix.default(object, data = object$training.data))
+}

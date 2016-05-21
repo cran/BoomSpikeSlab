@@ -84,6 +84,7 @@ extern "C" {
       SEXP r_initial_beta,
       SEXP r_seed) {
     RErrorReporter error_reporter;
+    RMemoryProtector protector;
     try {
       seed_rng_from_R(r_seed);
       RListIoManager io_manager;
@@ -97,14 +98,16 @@ extern "C" {
           &io_manager);
       int niter = Rf_asInteger(r_niter);
       int ping = Rf_asInteger(r_ping);
-      SEXP ans;
-      PROTECT(ans = io_manager.prepare_to_write(niter));
+      SEXP ans = protector.protect(io_manager.prepare_to_write(niter));
       for (int i = 0; i < niter; ++i) {
+        if (RCheckInterrupt()) {
+          error_reporter.SetError("Canceled by user.");
+          return R_NilValue;
+        }
         print_R_timestamp(i, ping);
         model->sample_posterior();
         io_manager.write();
       }
-      UNPROTECT(1);
       return ans;
     } catch (std::exception &e) {
       handle_exception(e);

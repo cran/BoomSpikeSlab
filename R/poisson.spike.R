@@ -57,6 +57,7 @@ poisson.spike <- function(
   ##  In addition, the returned object contains sufficient details for
   ##  the call to model.matrix in the predict.lm.spike method.
 
+  has.data <- !missing(data)
   cl <- match.call()
   mf <- match.call(expand.dots = FALSE)
   m <- match(c("formula", "data", "subset", "na.action"), names(mf), 0L)
@@ -129,6 +130,19 @@ poisson.spike <- function(
 
   if (!is.null(initial.value) && inherits(initial.value, "poisson.spike")) {
     ans$beta <- rbind(initial.value$beta, ans$beta)
+  }
+
+  if (has.data) {
+    ## Note, if a data.frame was passed as an argument to this function
+    ## then saving the data frame will be cheaper than saving the
+    ## model.frame.
+    ans$training.data <- data
+  } else {
+    ## If the model was called with a formula referring to objects in
+    ## another environment, then saving the model frame will capture
+    ## these variables so they can be used to recreate the design
+    ## matrix.
+    ans$training.data <- mf
   }
 
   ## Make the answer a class, so that the right methods will be used.
@@ -223,17 +237,31 @@ predict.poisson.spike <- function(object, newdata, burn = 0,
     dimnames(ans$beta)[[2]] <- variable.names
   }
   ans$prior <- prior
+
+  log.lambda <- x %*% t(ans$beta)
+  log.exposure <- log(exposure)
+  log.likelihood.contributions <- y * (log.lambda + log.exposure) -
+      exp(log.lambda + log.exposure)
+  ans$log.likelihood <- colSums(log.likelihood.contributions)
+
   class(ans) <- c("poisson.spike", "glm.spike", "lm.spike")
   return(ans)
 }
 
 plot.poisson.spike <- function(
     x,
-    y = c("coefficients", "size", "help"),
+    y = c("inclusion", "coefficients", "scaled.coefficients", "size", "help"),
+    burn = SuggestBurnLogLikelihood(x$log.likelihood),
     ...) {
   y <- match.arg(y)
-  if (y == "coefficients") {
-    return(PlotMarginalInclusionProbabilities(x$beta, ...))
+  if (y == "inclusion") {
+    return(PlotMarginalInclusionProbabilities(x$beta, burn = burn, ...))
+  } else if (y == "coefficients") {
+    return(PlotLmSpikeCoefficients(x$beta, burn = burn, ...))
+  } else if (y == "scaled.coefficients") {
+    scale.factors <- apply(model.matrix(x), 2, sd)
+    return(PlotLmSpikeCoefficients(x$beta, burn = burn,
+                                   scale.factors = scale.factors, ...))
   } else if (y == "size") {
     return(PlotModelSize(x$beta, ...))
   } else if (y == "help") {

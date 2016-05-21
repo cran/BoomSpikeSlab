@@ -16,7 +16,9 @@
 
 \usage{
   \method{plot}{logit.spike}(x,
-     y = c("coefficients", "fit", "residuals", "size", "help"),
+     y = c("inclusion", "coefficients", "scaled.coefficients", "fit",
+           "residuals", "size", "help"),
+     burn = SuggestBurnLogLikelihood(x$log.likelihood),
      ...)
 }
 \arguments{
@@ -26,6 +28,10 @@
 
   \item{y}{
     The type of plot desired.
+  }
+
+  \item{burn}{
+    The number of MCMC iterations to discard as burn-in.
   }
 
   \item{\dots}{ Additional arguments passed to the specific functions

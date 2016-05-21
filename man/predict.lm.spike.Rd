@@ -15,8 +15,8 @@
 }
 
 \usage{
-\method{predict}{lm.spike}(object, newdata, burn = 0,
-    na.action = na.pass, ...)
+\method{predict}{lm.spike}(object, newdata = NULL, burn = 0,
+    na.action = na.pass, mean.only = FALSE, ...)
 
 \method{predict}{logit.spike}(object, newdata, burn = 0,
     type = c("prob", "logit", "link", "response"),
@@ -32,15 +32,21 @@
     An object of class \code{lm.spike}.
   }
 
-  \item{newdata}{
-    A data frame, matrix, or vector containing the predictors needed to
-    make the prediction.  If \code{newdata} is a \code{data.frame} it
-    must contain variables with the same names as the data frame used to
-    fit \code{object}.  If it is a \code{matrix}, it must have the same
-    number of columns as \code{object$beta}.  An intercept term will be
-    implicitly added if the number of columns is too small by one.  If the
-    dimension of \code{object$beta} is 1 or 2, then \code{newdata} can
-    be a vector. }
+  \item{newdata}{ Either \code{NULL}, or else a data frame, matrix, or
+    vector containing the predictors needed to make the prediction.
+
+    If \code{newdata} is \code{NULL} then the predictors are taken from
+    the training data used to create the model object.  Note that
+    \code{object} does not store its training data, so the data objects
+    used to fit the model must be present for the training data to be
+    recreated.
+
+    If \code{newdata} is a \code{data.frame} it must contain variables
+    with the same names as the data frame used to fit \code{object}.  If
+    it is a \code{matrix}, it must have the same number of columns as
+    \code{object$beta}.  An intercept term will be implicitly added if
+    the number of columns is too small by one.  If the dimension of
+    \code{object$beta} is 1 or 2, then \code{newdata} can be a vector. }
 
   \item{burn}{
     The number of MCMC iterations in the object to be discarded as
@@ -67,7 +73,11 @@
     Both cases also accept \code{link} and \code{response} for
     compatibility with \code{predict.glm}.  }
 
-  \item{\dots}{Unused, but present for compatibility with generic \code{predict()}.}
+  \item{mean.only}{Logical.  If \code{TRUE} then return the posterior
+    mean of the predictive distribution.  If \code{FALSE} then return
+    the entire distribution.}
+
+  \item{\dots}{Unused, but present for compatibility with generic \code{predict}.}
 
 }
 \value{

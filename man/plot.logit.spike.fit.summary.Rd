@@ -27,7 +27,7 @@ PlotLogitSpikeFitSummary(
 
   \item{model}{A model object inheriting from \code{\link{logit.spike}}.}
 
-  \item{burn}{ The number of MCMC iterations in the ojbect to be
+  \item{burn}{ The number of MCMC iterations in the object to be
     discarded as burn-in.  Note that this only affects the deviance
     R-square plot.  The fit summaries in the Hosmer-Lemeshow plot are
     constructed by \code{\link{logit.spike}} in order to keep permanent

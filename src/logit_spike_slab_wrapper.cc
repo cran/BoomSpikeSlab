@@ -4,6 +4,9 @@
 #include <exception>
 #include <string>
 
+#include "r_interface/check_interrupt.h"
+#include "r_interface/error.h"
+
 #include "cpputil/Ptr.hpp"
 #include "r_interface/print_R_timestamp.hpp"
 #include "r_interface/handle_exception.hpp"
@@ -26,14 +29,9 @@
 #include "R.h"
 
 extern "C" {
-  using BOOM::SpdMatrix;
-  using BOOM::Matrix;
-  using BOOM::Vector;
-  using BOOM::ConstVectorView;
-  using BOOM::VectorView;
-  using BOOM::MvnModel;
-  using BOOM::VariableSelectionPrior;
-  using BOOM::Ptr;
+  using BOOM::RErrorReporter;
+  using BOOM::RCheckInterrupt;
+  using namespace BOOM;  // NOLINT
 
   // This function is a wrapper for spike and slab regression.  It
   // takes input from R and formats it for the appropriate BOOM
@@ -50,6 +48,8 @@ extern "C" {
       SEXP r_clt_threshold,  // see comments in ../R/logit.spike.R
       SEXP r_mh_chunk_size,  // see comments in ../R/logit.spike.R
       SEXP r_seed)  {
+    RErrorReporter error_reporter;
+    RMemoryProtector protector;
     try {
       BOOM::RInterface::seed_rng_from_R(r_seed);
       Matrix design_matrix(BOOM::ToBoomMatrix(r_x));
@@ -104,17 +104,18 @@ extern "C" {
           new BOOM::GlmCoefsListElement(
               model->coef_prm(),
               "beta"));
-      SEXP ans;
-      PROTECT(ans = io_manager.prepare_to_write(niter));
+      SEXP ans = protector.protect(io_manager.prepare_to_write(niter));
       int ping = Rf_asInteger(r_ping);
 
       for (int i = 0; i < niter; ++i) {
-        R_CheckUserInterrupt();
+        if (RCheckInterrupt()) {
+          error_reporter.SetError("Canceled by user.");
+          return R_NilValue;
+        }
         BOOM::print_R_timestamp(i, ping);
         sampler->draw();
         io_manager.write();
       }
-      UNPROTECT(1);
       return ans;
     } catch(std::exception &e) {
       BOOM::RInterface::handle_exception(e);

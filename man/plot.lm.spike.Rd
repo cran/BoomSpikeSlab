@@ -17,7 +17,11 @@
 }
 
 \usage{
-  \method{plot}{lm.spike}(x, y = c("coefficients", "size", "help"), ...)
+  \method{plot}{lm.spike}(x,
+     y = c("inclusion", "coefficients", "scaled.coefficients",
+              "residuals", "size", "help"),
+     burn = SuggestBurnLogLikelihood(x$log.likelihood),
+     ...)
 }
 \arguments{
   \item{x}{
@@ -28,15 +32,20 @@
     The type of plot desired.
   }
 
+  \item{burn}{
+    The number of MCMC iterations to discard as burn-in.
+  }
+
   \item{\dots}{ Additional arguments passed to the specific functions
     that do the plotting.  }
 
 }
 
 \details{ The actual plotting will be handled by
-  \code{\link{PlotMarginalInclusionProbabilities}} or
-  \code{\link{PlotModelSize}}.  See the appropriate function for more
-  options.}
+  \code{\link{PlotMarginalInclusionProbabilities}},
+  \code{\link{PlotLmSpikeCoefficients}},
+  \code{\link{PlotLmSpikeResiduals}}, or \code{\link{PlotModelSize}}.
+  See the appropriate function for more options.}
 
 \author{
   Steven L. Scott
@@ -44,6 +53,8 @@
 
 \seealso{
   \code{\link{PlotMarginalInclusionProbabilities}}
+  \code{\link{PlotLmSpikeCoefficients}}
+  \code{\link{PlotLmSpikeResiduals}}
   \code{\link{PlotModelSize}}
   \code{\link{lm.spike}}
   \code{\link{SpikeSlabPrior}}
