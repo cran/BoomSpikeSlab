@@ -4,7 +4,7 @@ Title: MCMC for Spike and Slab Regression
 Author: Steven L. Scott <stevescott@google.com>
 Maintainer: Steven L. Scott <stevescott@google.com>
 Description: Spike and slab regression a la McCulloch and George (1997).
-Depends: Boom (>= 0.4) , R (>= 3.1.0)
+Depends: Boom (>= 0.4), R (>= 3.1.0)
 LinkingTo: BH (>= 1.15.0-2)
 Suggests: MASS
 Version: 0.6.0
