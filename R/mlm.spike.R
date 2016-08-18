@@ -244,7 +244,7 @@ mlm.spike <- function(subject.formula,
   }
 
   ## Run the sampler.
-  ans<- .Call(multinomial_logit_spike_slab,
+  ans<- .Call(analysis_common_r_multinomial_logit_spike_slab,
               response,
               subject.predictor.matrix,
               choice.predictor.matrix,

@@ -132,7 +132,7 @@ lm.spike <- function(formula,
     prior$max.flips <- -1
   }
 
-  ans <- .Call(do_spike_slab,
+  ans <- .Call(analysis_common_r_do_spike_slab,
                x,
                y,
                prior,

@@ -4,6 +4,7 @@
 \name{summary.logit.spike}
 \Rdversion{1.1}
 \alias{summary.logit.spike}
+\alias{summary.probit.spike}
 \title{
   Numerical summaries of the results from a spike and slab logistic regression.
 }
@@ -21,10 +22,19 @@
         number.of.buckets = 10,
         coefficients = TRUE,
         ...)
+
+\method{summary}{probit.spike}(object,
+        burn = 0,
+        order = TRUE,
+        cutpoint.scale = c("probability", "probit"),
+        cutpoint.basis = c("sample.size", "equal.range"),
+        number.of.buckets = 10,
+        coefficients = TRUE,
+        ...)
 }
 \arguments{
   \item{object}{
-    An object of class \code{logit.spike}.
+    An object of class \code{logit.spike} or \code{probit.spike}.
   }
 
   \item{burn}{
@@ -97,6 +107,7 @@
 
 \seealso{
   \code{\link{logit.spike}}
+  \code{\link{probit.spike}}
   \code{\link{SpikeSlabPrior}}
 }
 

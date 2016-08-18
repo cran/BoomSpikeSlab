@@ -1,6 +1,7 @@
 \name{plot.logit.spike}
 \Rdversion{1.1}
 \alias{plot.logit.spike}
+\alias{plot.probit.spike}
 \title{
   Plot a \code{\link{logit.spike}} object
 }
@@ -16,6 +17,12 @@
 
 \usage{
   \method{plot}{logit.spike}(x,
+     y = c("inclusion", "coefficients", "scaled.coefficients", "fit",
+           "residuals", "size", "help"),
+     burn = SuggestBurnLogLikelihood(x$log.likelihood),
+     ...)
+
+  \method{plot}{probit.spike}(x,
      y = c("inclusion", "coefficients", "scaled.coefficients", "fit",
            "residuals", "size", "help"),
      burn = SuggestBurnLogLikelihood(x$log.likelihood),

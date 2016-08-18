@@ -222,7 +222,7 @@ predict.poisson.spike <- function(object, newdata, burn = 0,
     seed <- .Random.seed[1]
   }
 
-  ans <- .Call(poisson_regression_spike_slab,
+  ans <- .Call(analysis_common_r_poisson_regression_spike_slab,
                x,
                as.integer(y),
                exposure,

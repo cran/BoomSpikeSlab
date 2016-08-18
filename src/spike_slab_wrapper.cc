@@ -3,9 +3,6 @@
 
 #include <exception>
 
-#include "r_interface/check_interrupt.h"
-#include "r_interface/error.h"
-
 #include "Models/Glm/PosteriorSamplers/BregVsSampler.hpp"
 #include "Models/Glm/PosteriorSamplers/SpikeSlabDaRegressionSampler.hpp"
 #include "Models/Glm/PosteriorSamplers/TRegressionSpikeSlabSampler.hpp"
@@ -161,11 +158,9 @@ namespace {
 }  // namespace
 
 extern "C" {
-  using BOOM::RErrorReporter;
-  using BOOM::RCheckInterrupt;
   using namespace BOOM;  // NOLINT
 
-  SEXP do_spike_slab(SEXP r_design_matrix,
+  SEXP analysis_common_r_do_spike_slab(SEXP r_design_matrix,
                                        SEXP r_response_vector,
                                        SEXP r_spike_slab_prior,
                                        SEXP r_error_distribution,

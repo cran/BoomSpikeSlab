@@ -1,8 +1,9 @@
 \name{plot.logit.spike.fit.summary}
 \Rdversion{1.1}
 \alias{PlotLogitSpikeFitSummary}
+\alias{PlotProbitSpikeFitSummary}
 \title{
-  Fit summary for logit.spike models
+  Plot Logit or Probit Fit Summary
 }
 \description{
   Two plots can be accessed by this function.  The first is a time
@@ -22,17 +23,27 @@ PlotLogitSpikeFitSummary(
     cutpoint.basis = c("sample.size", "equal.range"),
     number.of.buckets = 10,
     ...)
+
+PlotProbitSpikeFitSummary(
+    model,
+    burn = 0,
+    which.summary = c("both", "r2", "bucket"),
+    scale = c("probit", "probability"),
+    cutpoint.basis = c("sample.size", "equal.range"),
+    number.of.buckets = 10,
+    ...)
 }
 \arguments{
 
-  \item{model}{A model object inheriting from \code{\link{logit.spike}}.}
+  \item{model}{A model object inheriting from \code{\link{logit.spike}}
+    or \code{\link{probit.spike}}.}
 
   \item{burn}{ The number of MCMC iterations in the object to be
     discarded as burn-in.  Note that this only affects the deviance
     R-square plot.  The fit summaries in the Hosmer-Lemeshow plot are
-    constructed by \code{\link{logit.spike}} in order to keep permanent
-    object sizes small.
-  }
+    constructed by \code{\link{logit.spike}} or
+    \code{\link{probit.spike}} in order to keep permanent object sizes
+    small.  }
 
   \item{which.summary}{Which plot is desired?}
 
@@ -42,7 +53,7 @@ PlotLogitSpikeFitSummary(
   \item{cutpoint.basis}{How should cutpoints be determined for the
     Hosmer-Lemeshow plot?  If \code{"sample.size"} then each bucket will
     have equal sample size.  If \code{"equal.range"} then each bucket
-    will occupy the same size on the chosen (logit or probability) scale.}
+    will occupy the same size on the chosen (logit/probit or probability) scale.}
 
   \item{number.of.buckets}{The number of buckets to use in the
     Hosmer-Lemeshow plot.}

@@ -12,9 +12,6 @@
 #include <r_interface/prior_specification.hpp>
 #include <r_interface/seed_rng_from_R.hpp>
 
-#include "r_interface/check_interrupt.h"
-#include "r_interface/error.h"
-
 #ifndef R_NO_REMAP
 #define R_NO_REMAP
 #endif
@@ -120,9 +117,7 @@ namespace {
 }  // namespace
 
 extern "C" {
-  using BOOM::RErrorReporter;
-  using BOOM::RCheckInterrupt;
-  SEXP multinomial_logit_spike_slab(
+  SEXP analysis_common_r_multinomial_logit_spike_slab(
       SEXP r_response_factor,
       SEXP r_subject_predictor_matrix,
       SEXP r_choice_predictor_matrix,

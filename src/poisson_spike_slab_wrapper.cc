@@ -1,8 +1,5 @@
 #include <exception>
 
-#include "r_interface/check_interrupt.h"
-#include "r_interface/error.h"
-
 #include "Models/Glm/PoissonRegressionModel.hpp"
 #include "Models/Glm/PosteriorSamplers/PoissonRegressionSpikeSlabSampler.hpp"
 
@@ -69,11 +66,9 @@ namespace {
 }  // namespace
 
 extern "C" {
-  using BOOM::RErrorReporter;
-  using BOOM::RCheckInterrupt;
   using namespace BOOM;  // NOLINT
 
-  SEXP poisson_regression_spike_slab(
+  SEXP analysis_common_r_poisson_regression_spike_slab(
       SEXP r_design_matrix,
       SEXP r_integer_response_vector,
       SEXP r_exposure_vector,

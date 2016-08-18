@@ -1,6 +1,7 @@
 \name{plot.logit.spike.residuals}
 \Rdversion{1.1}
 \alias{PlotLogitSpikeResiduals}
+\alias{PlotProbitSpikeResiduals}
 \title{
   Residual plot for \code{\link{logit.spike}} objects.
 }
@@ -11,10 +12,13 @@
 
 \usage{
   PlotLogitSpikeResiduals(model, ...)
+  PlotProbitSpikeResiduals(model, ...)
 }
 
 \arguments{
-  \item{model}{A model object inheriting from \code{\link{logit.spike}}.}
+  \item{model}{A model object inheriting from \code{\link{logit.spike}}
+  or \code{\link{probit.spike}}.}
+
   \item{\dots}{
     Additional arguments to be passed to \code{\link{plot}.}
   }

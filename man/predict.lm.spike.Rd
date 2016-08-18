@@ -5,6 +5,7 @@
 \Rdversion{1.1}
 \alias{predict.lm.spike}
 \alias{predict.logit.spike}
+\alias{predict.probit.spike}
 \alias{predict.poisson.spike}
 \title{
   Predictions using spike-and-slab regression.
@@ -25,6 +26,11 @@
 \method{predict}{poisson.spike}(object, newdata, burn = 0,
     type = c("mean", "log", "link", "response"),
     na.action = na.pass, ...)
+
+\method{predict}{probit.spike}(object, newdata, burn = 0,
+    type = c("prob", "probit", "link", "response"),
+    na.action = na.pass, ...)
+
 }
 
 \arguments{
@@ -64,7 +70,7 @@
 
     For \code{logit.spike}, \code{prob} means the prediction is returned
     on the probability scale, while \code{logit} returns the scale of
-    the linear predictor.
+    the linear predictor.  Probits work similarly to logits.
 
     For \code{poisson.spike}, \code{mean} means the prediction is
     returned on the scale of the data, while \code{log} means it is on
