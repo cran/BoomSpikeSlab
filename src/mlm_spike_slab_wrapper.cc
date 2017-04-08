@@ -64,7 +64,7 @@ namespace {
           choice_predictor_data.push_back(new VectorData(
               choice_predictors.vector_slice(i, m, -1)));
         }
-        NEW(ChoiceData, dp)(response.to_cateogrical_data(i),
+        NEW(ChoiceData, dp)(response.to_categorical_data(i),
                             new VectorData(subject_predictor_matrix.row(i)),
                             choice_predictor_data);
         model->add_data(dp);
@@ -73,7 +73,7 @@ namespace {
       std::vector<Ptr<VectorData> > empty;
       for (int i = 0; i < response.length(); ++i) {
         NEW(ChoiceData, dp)(
-            response.to_cateogrical_data(i),
+            response.to_categorical_data(i),
             new VectorData(subject_predictor_matrix.row(i)),
             empty);
         model->add_data(dp);

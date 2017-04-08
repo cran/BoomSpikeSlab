@@ -11,8 +11,7 @@ importFrom("stats", ".checkMFClasses", ".getXlevels", "as.formula",
            "terms", "update", "var")
 importFrom("utils", "help", "tail")
 
-export(
-       GetPredictorMatrix,
+export(GetPredictorMatrix,
        IndependentSpikeSlabPrior,
        LogitZellnerPrior,
        MultinomialLogitSpikeSlabPrior,
@@ -35,12 +34,17 @@ export(
        mlm.spike,
        model.matrix.glm.spike,
        plot.lm.spike,
+       plot.logit.spike,
+       plot.qreg.spike,
+       plot.poisson.spike,
        poisson.spike,
        predict.lm.spike,
        predict.logit.spike,
        predict.probit.spike,
        predict.poisson.spike,
+       predict.qreg.spike,
        probit.spike,
+       qreg.spike,
        residuals.lm.spike,
        summary.lm.spike,
        summary.logit.spike,
@@ -68,10 +72,9 @@ S3method(print, summary.probit.spike)
 S3method(plot, poisson.spike)
 S3method(predict, poisson.spike)
 
+S3method(plot, qreg.spike)
+S3method(predict, qreg.spike)
+
 S3method(print, summary.logit.spike)
-useDynLib(BoomSpikeSlab,
-          analysis_common_r_do_spike_slab,
-          logit_spike_slab_wrapper,
-          analysis_common_r_multinomial_logit_spike_slab,
-          analysis_common_r_poisson_regression_spike_slab,
-          probit_spike_slab_wrapper)
+
+useDynLib(BoomSpikeSlab, .registration = TRUE)

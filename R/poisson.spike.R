@@ -208,10 +208,6 @@ predict.poisson.spike <- function(object, newdata, burn = 0,
             length(prior$prior.inclusion.probabilities) == ncol(x),
             all(y >= 0))
 
-  nobs <- nrow(x)
-  p <- ncol(x)
-  beta.draws <- matrix(0, nrow=niter, ncol = p)
-
   if (is.null(prior$max.flips)) {
     prior$max.flips <- -1
   }

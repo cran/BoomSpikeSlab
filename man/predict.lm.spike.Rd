@@ -7,6 +7,7 @@
 \alias{predict.logit.spike}
 \alias{predict.probit.spike}
 \alias{predict.poisson.spike}
+\alias{predict.qreg.spike}
 \title{
   Predictions using spike-and-slab regression.
 }
@@ -29,6 +30,9 @@
 
 \method{predict}{probit.spike}(object, newdata, burn = 0,
     type = c("prob", "probit", "link", "response"),
+    na.action = na.pass, ...)
+
+\method{predict}{qreg.spike}(object, newdata, burn = 0,
     na.action = na.pass, ...)
 
 }
