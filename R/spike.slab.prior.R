@@ -81,8 +81,11 @@ SpikeSlabPriorBase <- function(number.of.variables,
   ## Compute sigma.guess (guess at the residual standard deviation)
   stopifnot(is.numeric(expected.r2))
   stopifnot(length(expected.r2) == 1)
-  stopifnot(expected.r2 < 1 && expected.r2 > 0)
-  stopifnot(is.numeric(sdy) && length(sdy) == 1 && sdy > 0)
+  stopifnot(expected.r2 < 1,
+            expected.r2 > 0)
+  stopifnot(is.numeric(sdy),
+            length(sdy) == 1,
+            sdy > 0)
   sigma.guess <- sqrt((1 - expected.r2)) * sdy
   ## Compute mu, the conditional prior mean of beta (given nonzero)
   if (!is.null(optional.coefficient.estimate)) {
@@ -101,9 +104,12 @@ SpikeSlabPriorBase <- function(number.of.variables,
     mu[1] <- mean.y
   }
 
-  stopifnot(is.numeric(prior.df) && length(prior.df) == 1 && prior.df >= 0)
+  stopifnot(is.numeric(prior.df),
+            length(prior.df) == 1,
+            prior.df >= 0)
 
-  stopifnot(is.numeric(sigma.upper.limit) && length(sigma.upper.limit == 1))
+  stopifnot(is.numeric(sigma.upper.limit),
+            length(sigma.upper.limit) == 1)
   if (sigma.upper.limit <= 0) {
     sigma.upper.limit <- Inf
   }
@@ -311,7 +317,7 @@ IndependentSpikeSlabPrior <- function(
   ##     sigma_sq * V, where sigma_sq is the residual variance of the
   ##     linear regression modeled by this prior.  Otherwise the prior
   ##     variance is V, unscaled.
-  stopifnot(is.logical(scale.by.residual.variance) &&
+  stopifnot(is.logical(scale.by.residual.variance),
             length(scale.by.residual.variance) == 1)
   ans <- SpikeSlabPriorBase(
       number.of.variables = number.of.variables,
@@ -657,7 +663,7 @@ PoissonZellnerPrior <- function(
       prior.event.rate <- mean(counts, na.rm = TRUE)
     } else {
       stopifnot(length(exposure) == length(counts),
-                all(exposure > 0))
+                all(exposure > 0, na.rm = TRUE))
       prior.event.rate =
           sum(counts, na.rm = TRUE) / sum(exposure, na.rm = TRUE)
     }

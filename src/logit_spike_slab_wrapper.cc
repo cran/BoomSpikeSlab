@@ -42,6 +42,7 @@ extern "C" {
       SEXP r_beta0,          // initial value in the MCMC simulation
       SEXP r_clt_threshold,  // see comments in ../R/logit.spike.R
       SEXP r_mh_chunk_size,  // see comments in ../R/logit.spike.R
+      SEXP r_sampler_weights,
       SEXP r_seed)  {
     RErrorReporter error_reporter;
     RMemoryProtector protector;
@@ -86,6 +87,10 @@ extern "C" {
       if (prior.max_flips() > 0) {
         sampler->limit_model_selection(prior.max_flips());
       }
+      BOOM::Vector sampler_weights = BOOM::ToBoomVector(r_sampler_weights);
+      sampler->set_sampler_weights(sampler_weights[0],
+                                   sampler_weights[1],
+                                   sampler_weights[2]);
 
       BOOM::spikeslab::InitializeCoefficients(
           BOOM::ToBoomVector(r_beta0),

@@ -27,6 +27,7 @@ logit.spike(formula,
             clt.threshold = 2,
             mh.chunk.size = 10,
             proposal.df = 3,
+            sampler.weights = c("DA" = .333, "RWM" = .333, "TIM" = .333),
             seed = NULL,
             ...)
 }
@@ -103,6 +104,12 @@ logit.spike(formula,
 
   \item{proposal.df}{The degrees of freedom parameter to use in
     Metropolis-Hastings proposals.  See details.}
+
+  \item{sampler.weights}{The proportion of MCMC iterations spent in each
+    of the three algorithms described in the Details section. This must
+    be a vector of length 3, with names "DA", "RWM" and "TIM",
+    containing non-negative elements that sum to (within numerical
+    error .999 or 1.001 are okay).}
 
   \item{seed}{Seed to use for the C++ random number generator.  It
     should be \code{NULL} or an int.  If \code{NULL} the seed value will

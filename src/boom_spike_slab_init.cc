@@ -27,6 +27,7 @@ SEXP logit_spike_slab_wrapper(
     SEXP r_beta0,          // initial value in the MCMC simulation
     SEXP r_clt_threshold,  // see comments in ../R/logit.spike.R
     SEXP r_mh_chunk_size,  // see comments in ../R/logit.spike.R
+    SEXP r_sampling_weights,  // see comments in ../R/logit.spike.R
     SEXP r_seed);
 
 SEXP analysis_common_r_multinomial_logit_spike_slab(
@@ -80,13 +81,34 @@ SEXP analysis_common_r_quantile_regression_spike_slab(
     SEXP r_initial_beta,
     SEXP r_seed);
 
+SEXP boom_shrinkage_regression_wrapper(
+    SEXP r_regression_suf,
+    SEXP r_coefficient_groups,
+    SEXP r_residual_precision_prior,
+    SEXP r_niter,
+    SEXP r_ping,
+    SEXP r_seed);
+
+SEXP boom_nested_regression_wrapper(
+    SEXP r_regression_suf_list,
+    SEXP r_coefficient_prior,
+    SEXP r_coefficient_mean_hyperprior,
+    SEXP r_coefficient_variance_hyperprior,
+    SEXP r_residual_precision_prior,
+    SEXP r_niter,
+    SEXP r_ping,
+    SEXP r_sampling_method,
+    SEXP r_seed);
+
 static R_CallMethodDef spike_slab_arg_description[] = {
   CALLDEF(analysis_common_r_do_spike_slab, 9),
-  CALLDEF(logit_spike_slab_wrapper, 11),
+  CALLDEF(logit_spike_slab_wrapper, 12),
   CALLDEF(analysis_common_r_multinomial_logit_spike_slab, 14),
   CALLDEF(analysis_common_r_poisson_regression_spike_slab, 9),
   CALLDEF(probit_spike_slab_wrapper, 11),
   CALLDEF(analysis_common_r_quantile_regression_spike_slab, 9),
+  CALLDEF(boom_shrinkage_regression_wrapper, 6),
+  CALLDEF(boom_nested_regression_wrapper, 9),
   {NULL, NULL, 0}
 };
 

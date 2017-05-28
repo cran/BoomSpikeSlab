@@ -15,6 +15,8 @@ logit.spike <- function(formula,
                         clt.threshold = 2,
                         mh.chunk.size = 10,
                         proposal.df = 3,
+                        sampler.weights = c("DA" = .333, "RWM" = .333,
+                                            "TIM" = .333),
                         seed = NULL,
                         ...) {
   ## Uses Bayesian MCMC to fit a logistic regression model with a
@@ -61,6 +63,11 @@ logit.spike <- function(formula,
   ##     multivariate T proposal distribution used for
   ##     Metropolis-Hastings updates.  A nonpositive number means to
   ##     use a Gaussian proposal.
+  ##   sampler.weights: A 3-vector representing a discrete probability
+  ##     distribution.  What fraction of the time should the sampler spend.  The
+  ##     vector must have names "DA", "TIM", and "RWM" corresponding to data
+  ##     augmentation, tailored independence Metropolis, and random walk
+  ##     Metropolis.
   ##   seed: Seed to use for the C++ random number generator.  NULL or
   ##     an int.  If NULL, then the seed will be taken from the global
   ##     .Random.seed object.
@@ -75,6 +82,14 @@ logit.spike <- function(formula,
   ##   prior:  The prior that was used to fit the model.
   ##  In addition, the returned object contains sufficient details for
   ##  the call to model.matrix in the predict.lm.spike method.
+  stopifnot(is.numeric(sampler.weights),
+            length(sampler.weights) == 3,
+            "DA" %in% names(sampler.weights),
+            "TIM" %in% names(sampler.weights),
+            "RWM" %in% names(sampler.weights),
+            all(sampler.weights >= 0),
+            all(sampler.weights <= 1),
+            abs(sum(sampler.weights) - 1.0) < .01)
   has.data <- !missing(data)
   cl <- match.call()
   mf <- match.call(expand.dots = FALSE)
@@ -142,6 +157,10 @@ logit.spike <- function(formula,
   if (!is.null(seed)) {
     seed <- as.integer(seed)
   }
+
+  ## Make sure the sampler weights are in the expected order.
+  sampler.weights <- sampler.weights[c("DA", "RWM", "TIM")]
+
   ans <- .Call("logit_spike_slab_wrapper",
                as.matrix(design),
                as.integer(response),
@@ -153,6 +172,7 @@ logit.spike <- function(formula,
                beta0,
                as.integer(clt.threshold),
                as.integer(mh.chunk.size),
+               sampler.weights,
                seed)
 
   ans$prior <- prior

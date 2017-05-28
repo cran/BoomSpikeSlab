@@ -89,7 +89,7 @@
 
     \item{deviance.r2: The deviance R-square obtained by taking
       \code{(null.likelihood - mean.log.likelihood) /
-	null.log.likelihood}}
+        null.log.likelihood}}
 
     \item{deviance.r2.distribution: The value of the deviance R-square
       statistic at each point visited by the MCMC chain.  This is not
