@@ -7,59 +7,53 @@ SpikeSlabPriorBase <- function(number.of.variables,
                                sdy,
                                prior.inclusion.probabilities = NULL,
                                sigma.upper.limit = Inf) {
-  ## Computes information that is shared by the different
-  ## implementation of spike and slab priors.  Currently, the only
-  ## difference between the different priors is the prior variance on
-  ## the regression coefficients.  When that changes, change this
-  ## function accordingly, and change all the classes that inherit
-  ## from it.
+  ## Computes information that is shared by the different implementation of
+  ## spike and slab priors.  Currently, the only difference between the
+  ## different priors is the prior variance on the regression coefficients.
+  ## When that changes, change this function accordingly, and change all the
+  ## classes that inherit from it.
   ##
   ## Args:
-  ##   number.of.variables: The number of columns in the design matrix
-  ##     for the regression begin modeled.  The maximum size of the
-  ##     coefficient vector.
-  ##   expected.r2: The R^2 statistic that the model is expected to
-  ##     achieve.  Used along with 'sdy' to derive a prior
-  ##     distribution for the residual variance.
-  ##   prior.df: The number of observations worth of weight to give to
-  ##     the guess at the residual variance.
-  ##   expected.model.size: The expected number of nonzero
-  ##     coefficients in the model.  This number is used to set
-  ##     prior.inclusion.probabilities to expected.model.size /
-  ##     number.of.variables.  If expected.model.size is either
-  ##     negative or larger than number.of.variables then all elements
-  ##     of prior.inclusion.probabilities will be set to 1.0 and the
-  ##     model will be fit with all available coefficients.
-  ##   optional.coefficient.estimate: A vector of length
-  ##     number.of.variables to use as the prior mean of the
-  ##     regression coefficients.  This can also be NULL, in which
-  ##     case the prior mean for the intercept will be set to mean.y,
-  ##     and the prior mean for all slopes will be 0.
-  ##   mean.y: The mean of the response variable.  Used to create a
-  ##     sensible default prior mean for the regression coefficients
-  ##     when optional.coefficient.estimate is NULL.
-  ##   sdy: Used along with expected.r2 to create a prior guess at the
-  ##     residual variance.
-  ##   prior.inclusion.probabilities: A vector of length
-  ##     number.of.variables giving the prior inclusion probability of
-  ##     each coefficient.  Each element must be between 0 and 1,
-  ##     inclusive.  If left as NULL then a default value will be
-  ##     created with all elements set to expected.model.size /
-  ##     number.of.variables.
-  ##  sigma.upper.limit: The largest acceptable value for the residual
-  ##    standard deviation.  A non-positive number is interpreted as
-  ##    Inf.
+  ##   number.of.variables: The number of columns in the design matrix for the
+  ##     regression begin modeled.  The maximum size of the coefficient vector.
+  ##   expected.r2: The R^2 statistic that the model is expected to achieve.
+  ##     Used along with 'sdy' to derive a prior distribution for the residual
+  ##     variance.
+  ##   prior.df: The number of observations worth of weight to give to the guess
+  ##     at the residual variance.
+  ##   expected.model.size: The expected number of nonzero coefficients in the
+  ##     model.  This number is used to set prior.inclusion.probabilities to
+  ##     expected.model.size / number.of.variables.  If expected.model.size is
+  ##     either negative or larger than number.of.variables then all elements of
+  ##     prior.inclusion.probabilities will be set to 1.0 and the model will be
+  ##     fit with all available coefficients.
+  ##   optional.coefficient.estimate: A vector of length number.of.variables to
+  ##     use as the prior mean of the regression coefficients.  This can also be
+  ##     NULL, in which case the prior mean for the intercept will be set to
+  ##     mean.y, and the prior mean for all slopes will be 0.
+  ##   mean.y: The mean of the response variable.  Used to create a sensible
+  ##     default prior mean for the regression coefficients when
+  ##     optional.coefficient.estimate is NULL.
+  ##   sdy: Used along with expected.r2 to create a prior guess at the residual
+  ##     variance.
+  ##   prior.inclusion.probabilities: A vector of length number.of.variables
+  ##     giving the prior inclusion probability of each coefficient.  Each
+  ##     element must be between 0 and 1, inclusive.  If left as NULL then a
+  ##     default value will be created with all elements set to
+  ##     expected.model.size / number.of.variables.
+  ##  sigma.upper.limit: The largest acceptable value for the residual standard
+  ##    deviation.  A non-positive number is interpreted as Inf.
   ##
   ## Returns:
   ##   An object of class SpikeSlabPriorBase, which is a list with the
   ##   following elements:
-  ##   *) prior.inclusion.probabilities: A vector giving the prior
-  ##      inclusion probability of each coefficient.
+  ##   *) prior.inclusion.probabilities: A vector giving the prior inclusion
+  ##      probability of each coefficient.
   ##   *) mu: A vector giving the prior mean of each coefficient given
   ##      inclusion.
-  ##   *) sigma.guess:  A prior estimate of the residual standard deviation.
-  ##   *) prior.df: A number of observations worth of weight to assign
-  ##      to sigma.guess.
+  ##   *) sigma.guess: A prior estimate of the residual standard deviation.
+  ##   *) prior.df: A number of observations worth of weight to assign to
+  ##      sigma.guess.
 
   ## Compute prior.inclusion.probabilities, the prior inclusion probability
   if (is.null(prior.inclusion.probabilities)) {
@@ -119,10 +113,32 @@ SpikeSlabPriorBase <- function(number.of.variables,
               sigma.guess = sigma.guess,
               prior.df = prior.df,
               sigma.upper.limit = sigma.upper.limit)
-  class(ans) <- "SpikeSlabPriorBase"
+  class(ans) <- c("SpikeSlabPriorBase", "Prior")
   return(ans)
 }
 
+###======================================================================
+SpikeSlabPriorDirect <- function(coefficient.mean,
+                                 coefficient.precision,
+                                 prior.inclusion.probabilities,
+                                 prior.df,
+                                 sigma.guess,
+                                 max.flips = -1,
+                                 sigma.upper.limit = Inf) {
+  check.positive.scalar(sigma.guess)
+  check.positive.scalar(prior.df)
+  stopifnot(is.numeric(sigma.upper.limit), length(sigma.upper.limit) == 1)
+  ans <- SpikeSlabGlmPriorDirect(
+    coefficient.mean = coefficient.mean,
+    coefficient.precision = coefficient.precision,
+    prior.inclusion.probabilities = prior.inclusion.probabilities,
+    max.flips = max.flips)
+  ans$prior.df <- prior.df
+  ans$sigma.guess <- sigma.guess
+  ans$sigma.upper.limit <- sigma.upper.limit
+  class(ans) <- c("SpikeSlabPriorDirect", "SpikeSlabPrior", class(ans))
+  return(ans)
+}
 ###======================================================================
 SpikeSlabPrior <- function(x,
                            y = NULL,
@@ -348,7 +364,7 @@ IndependentSpikeSlabPrior <- function(
   class(ans) <- c("IndependentSpikeSlabPrior", class(ans))
   return(ans)
 }
-
+##===========================================================================
 StudentIndependentSpikeSlabPrior <- function(
     predictor.matrix = NULL,
     response.vector = NULL,
@@ -472,7 +488,55 @@ SpikeSlabGlmPrior <- function(
   xtwx <- diagonal.shrinkage * d + (1 - diagonal.shrinkage) * xtwx
   xtwx <- xtwx * prior.information.weight
   ans$siginv <- xtwx
-  class(ans) <- c("SpikeSlabGlmPrior", class(ans))
+  class(ans) <- c("SpikeSlabGlmPrior", "Prior", class(ans))
+  return(ans)
+}
+
+##===========================================================================
+SpikeSlabGlmPriorDirect <- function(coefficient.mean,
+                                    coefficient.precision,
+                                    prior.inclusion.probabilities = NULL,
+                                    expected.model.size = NULL,
+                                    max.flips = -1) {
+  ## A spike and slab prior for problems where you want to specify the
+  ## parameters directly, rather than in terms of the predictors and response.
+  ## The model is beta | gamma ~ N(mean[gamma], precision[gamma, gamma]), where
+  ## the elements of gamma are independent Bernoulli.
+  ##
+  ## Args:
+  ##   coefficient.mean: The mean of the 'slab' portion of the distribution if
+  ##     all variables were included.
+  ##   coefficient.precision: The precision (inverse variance) of the 'slab'
+  ##     portion of the distribution if all variables were included.
+  ##   prior.inclusion.probabilities: The probability that each variable is
+  ##     included.
+  ##   max.flips: The maximum number of include / exclude decsisions to explore
+  ##     in each MCMC iteration.  If max.flips <= 0 or if max.flips exceeds the
+  ##     dimension of beta then each element of gamma is sampled each iteration.
+  ##
+  ## Returns:
+  ##   A spike and slab prior that can be used for probit, logit, and Poisson
+  ##   models.
+  stopifnot(length(coefficient.mean) == nrow(coefficient.precision),
+    nrow(coefficient.precision) == ncol(coefficient.precision))
+  if (is.null(prior.inclusion.probabilities)) {
+    if (is.null(expected.model.size)) {
+      stop(paste0(
+        "Either 'expected.model.size' or 'prior.inclusion.probabilities' ",
+        "must be specified."))
+    }
+    check.positive.scalar(expected.model.size)
+    xdim <- length(coefficient.mean)
+    prior.inclusion.probabilities <- rep(expected.model.size / xdim, xdim)
+    prior.inclusion.probabilities[prior.inclusion.probabilities > 1] <- 1
+    prior.inclusion.probabilities[prior.inclusion.probabilities < 0] <- 0
+  } 
+  check.scalar.integer(max.flips)
+  ans <- list(mu = coefficient.mean,
+    siginv = coefficient.precision,
+    prior.inclusion.probabilities = prior.inclusion.probabilities,
+    max.flips = max.flips)
+  class(ans) <- c("SpikeSlabGlmPriorDirect", "SpikeSlabPriorBase", "Prior")
   return(ans)
 }
 
@@ -503,51 +567,43 @@ LogitZellnerPrior <- function(
   ## Args:
   ##   predictors: The design matrix for the regression problem.  No
   ##     missing data is allowed.
-  ##   successes: The vector of responses, which can be binary or
-  ##     counts.  If binary they can be 0/1, TRUE/FALSE, or 1/-1.  If
-  ##     counts, then the 'trials' argument must be specified as well.
-  ##     This is only used to obtain the empirical overall success
-  ##     rate, so it can be left NULL if prior.success.probability is
-  ##     specified.
-  ##   trials: A vector of the same length as successes, giving the
-  ##     number of trials for each success count (trials cannot be
-  ##     less than successes).  If successes is binary (or NULL) then
-  ##     this can be NULL as well, signifying that there was only one
-  ##     trial per experiment.
-  ##   prior.success.probability: An a priori guess at the overall
-  ##     frequency of successes.  Used in two places: to set the prior
-  ##     mean of the intercept (if optional.coefficient.estimate is
-  ##     NULL) and to weight the information matrix in the "slab"
-  ##     portion of the prior.
-  ##   expected.model.size: A positive number less than ncol(x),
-  ##     representing a guess at the number of significant predictor
-  ##     variables.  Used to obtain the 'spike' portion of the spike
-  ##     and slab prior.
-  ##   prior.information.weight: A positive scalar.  Number of
-  ##     observations worth of weight that should be given to the
-  ##     prior estimate of beta.
-  ##   diagonal.shrinkage: The conditionally Gaussian prior for beta
-  ##     (the "slab") starts with a precision matrix equal to the
-  ##     information in a single observation.  However, this matrix
-  ##     might not be full rank.  The matrix can be made full rank by
-  ##     averaging with its diagonal.  diagonal.shrinkage is the
-  ##     weight given to the diaonal in this average.  Setting this to
-  ##     zero gives Zellner's g-prior.
-  ##   optional.coefficient.estimate: If desired, an estimate of the
-  ##     regression coefficients can be supplied.  In most cases this
-  ##     will be a difficult parameter to specify.  If omitted then a
-  ##     prior mean of zero will be used for all coordinates except
-  ##     the intercept, which will be set to
+  ##   successes: The vector of responses, which can be binary or counts.  If
+  ##     binary they can be 0/1, TRUE/FALSE, or 1/-1.  If counts, then the
+  ##     'trials' argument must be specified as well.  This is only used to
+  ##     obtain the empirical overall success rate, so it can be left NULL if
+  ##     prior.success.probability is specified.
+  ##   trials: A vector of the same length as successes, giving the number of
+  ##     trials for each success count (trials cannot be less than successes).
+  ##     If successes is binary (or NULL) then this can be NULL as well,
+  ##     signifying that there was only one trial per experiment.
+  ##   prior.success.probability: An a priori (scalar) guess at the overall
+  ##     frequency of successes.  Used in two places: to set the prior mean of
+  ##     the intercept (if optional.coefficient.estimate is NULL) and to weight
+  ##     the information matrix in the "slab" portion of the prior.
+  ##   expected.model.size: A positive number less than ncol(x), representing a
+  ##     guess at the number of significant predictor variables.  Used to obtain
+  ##     the 'spike' portion of the spike and slab prior.
+  ##   prior.information.weight: A positive scalar.  Number of observations
+  ##     worth of weight that should be given to the prior estimate of beta.
+  ##   diagonal.shrinkage: The conditionally Gaussian prior for beta (the
+  ##     "slab") starts with a precision matrix equal to the information in a
+  ##     single observation.  However, this matrix might not be full rank.  The
+  ##     matrix can be made full rank by averaging with its diagonal.
+  ##     diagonal.shrinkage is the weight given to the diaonal in this average.
+  ##     Setting this to zero gives Zellner's g-prior.
+  ##   optional.coefficient.estimate: If desired, an estimate of the regression
+  ##     coefficients can be supplied.  In most cases this will be a difficult
+  ##     parameter to specify.  If omitted then a prior mean of zero will be
+  ##     used for all coordinates except the intercept, which will be set to
   ##     logit(prior.success.probability).
-  ##   max.flips: The maximum number of variable inclusion indicators
-  ##     the sampler will attempt to sample each iteration.  If negative
-  ##     then all indicators will be sampled.
-  ##   prior.inclusion.probabilities: A vector of length
-  ##     number.of.variables giving the prior inclusion probability of
-  ##     each coefficient.  Each element must be between 0 and 1,
-  ##     inclusive.  If left as NULL then a default value will be
-  ##     created with all elements set to expected.model.size /
-  ##     number.of.variables.
+  ##   max.flips: The maximum number of variable inclusion indicators the
+  ##     sampler will attempt to sample each iteration.  If negative then all
+  ##     indicators will be sampled.
+  ##   prior.inclusion.probabilities: A vector of length number.of.variables
+  ##     giving the prior inclusion probability of each coefficient.  Each
+  ##     element must be between 0 and 1, inclusive.  If left as NULL then a
+  ##     default value will be created with all elements set to
+  ##     expected.model.size / number.of.variables.
   if (is.null(prior.success.probability)) {
     if (is.null(trials)) {
       prior.success.probability <- mean(successes > 0, na.rm = TRUE)
@@ -592,7 +648,7 @@ LogitZellnerPrior <- function(
   return(ans)
 }
 
-
+##===========================================================================
 PoissonZellnerPrior <- function(
     predictors,
     counts = NULL,

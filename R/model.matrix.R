@@ -1,28 +1,26 @@
 GetPredictorMatrix <- function(object, newdata, na.action = na.omit, ...) {
-  ## Obtain the design matrix for making predictions based on a
-  ## glm.spike object.
+  ## Obtain the design matrix for making predictions based on a glm.spike
+  ## object.  This function performs much the same role as model.matrix, but it
+  ## allows for the 'newdata' argument to be a vector, matrix, or data frame.
   ##
   ## Args:
-  ##   object: An object of class glm.spike.  The object must be a
-  ##     list with the following elements
-  ##     * beta: a matrix of MCMC draws, with rows representing draws,
-  ##         and columns representing coefficients.
-  ##     * xlevels: the levels of any contrasts present in the original
-  ##         training data.
-  ##     * contrasts: the "contrasts" attribute of the original design
-  ##         matrix used to train the model.
+  ##   object: An object of class glm.spike.  The object must be a list with the
+  ##     following elements
+  ##     * beta: a matrix of MCMC draws, with rows representing draws, and
+  ##         columns representing coefficients.
+  ##     * xlevels: the levels of any contrasts present in the original training
+  ##         data.
+  ##     * contrasts: the "contrasts" attribute of the original design matrix
+  ##         used to train the model.
   ##     * terms: the terms of the formula used to fit the original model.
-  ##   newdata: A data frame, matrix, or vector containing the
-  ##     predictors needed to make a prediction.  If newdata is a
-  ##     matrix it must have the same number of columns as
-  ##     length(object$beta), unless it is off by one and the model
-  ##     contains an intercept, in which case an intercept term will
-  ##     be added.  If length(object$beta) == 1 (or 2, with one
-  ##     element containing an intercept) then newdata can be a
-  ##     numeric vector.
+  ##   newdata: A data frame, matrix, or vector containing the predictors needed
+  ##     to make a prediction.  If newdata is a matrix it must have the same
+  ##     number of columns as length(object$beta), unless it is off by one and
+  ##     the model contains an intercept, in which case an intercept term will
+  ##     be added.  If length(object$beta) == 1 (or 2, with one element
+  ##     containing an intercept) then newdata can be a numeric vector.
   ##   na.action:  what to do about NA's.
-  ##   ...: extra arguments passed to model.matrix (if newdata is a
-  ##     data frame).
+  ##   ...: extra arguments passed to model.matrix (if newdata is a data frame).
   ##
   ## Returns:
   ##   A matrix of predictor variables suitable for multiplication by
@@ -56,11 +54,9 @@ GetPredictorMatrix <- function(object, newdata, na.action = na.omit, ...) {
   } else if (is.vector(newdata) && beta.dimension == 1) {
     X <- matrix(newdata, ncol=1)
   } else {
-    stop("Error in predict.lm.spike:  newdata must be a matrix,",
-         "or a data.frame,",
+    stop("Argument 'newdata' must be a matrix or data.frame,",
          "unless dim(beta) <= 2, in which case it can be a vector")
   }
-
   if (ncol(X) != beta.dimension) {
     stop("The number of coefficients does not match the number",
          "of predictors in lm.spike")
@@ -68,11 +64,13 @@ GetPredictorMatrix <- function(object, newdata, na.action = na.omit, ...) {
   return(X)
 }
 
-model.matrix.glm.spike <- function(object, ...) {
+model.matrix.glm.spike <- function(object, data = NULL, ...) {
   ## S3 generic implementing model.matrix for glm.spike objects.
   ##
   ## Args:
   ##   object:  An object of class glm.spike.
+  ##   data: Either a data frame to use when building the model matrix, or NULL.
+  ##     If NULL then the training data from the original object will be used.
   ##   ...:  Extra arguments passed to model.matrix.default.
   ##
   ## Returns:
@@ -85,5 +83,8 @@ model.matrix.glm.spike <- function(object, ...) {
   ##   model.  If the training data is modified between when 'object'
   ##   is fit and when this function is called, the modifications will
   ##   be reflected in the returned value.
-  return(model.matrix.default(object, data = object$training.data))
+  if (is.null(data)) {
+    data = object$training.data
+  }
+  return(model.matrix.default(object, data = data))
 }

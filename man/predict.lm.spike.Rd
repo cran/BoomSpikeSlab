@@ -1,5 +1,5 @@
 % Copyright 2010 Google Inc. All Rights Reserved.
-% Author: stevescott@google.com (Steve Scott)
+% Author: steve.the.bayesian@gmail.com (Steve Scott)
 
 \name{predict.lm.spike}
 \Rdversion{1.1}
@@ -8,6 +8,7 @@
 \alias{predict.probit.spike}
 \alias{predict.poisson.spike}
 \alias{predict.qreg.spike}
+\alias{predict.BayesNnet}
 \title{
   Predictions using spike-and-slab regression.
 }
@@ -36,11 +37,14 @@
 \method{predict}{qreg.spike}(object, newdata, burn = 0,
     na.action = na.pass, ...)
 
+\method{predict}{BayesNnet}(object, newdata = NULL, burn = 0,
+    na.action = na.pass, mean.only = FALSE, seed = NULL, ...)
+
 }
 
 \arguments{
   \item{object}{
-    An object of class \code{lm.spike}.
+    A model object of class \code{lm.spike}, \code{logit.spike}, etc.
   }
 
   \item{newdata}{ Either \code{NULL}, or else a data frame, matrix, or
@@ -95,7 +99,12 @@
     mean of the predictive distribution.  If \code{FALSE} then return
     the entire distribution.}
 
-  \item{\dots}{Unused, but present for compatibility with generic \code{predict}.}
+  \item{seed}{Random seed for the C++ random number generator.  This is
+    only needed for models that require C++ to implement their predict
+    method.}
+  
+  \item{\dots}{Unused, but present for compatibility with generic
+    \code{predict}.}
 
 }
 \value{
