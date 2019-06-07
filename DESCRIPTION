@@ -1,17 +1,17 @@
 Package: BoomSpikeSlab
-Date: 2019-05-14
+Date: 2019-06-03
 Title: MCMC for Spike and Slab Regression
 Author: Steven L. Scott <steve.the.bayesian@gmail.com>
 Maintainer: Steven L. Scott <steve.the.bayesian@gmail.com>
 Description: Spike and slab regression a la McCulloch and George (1997).
-Depends: Boom (>= 0.9) , R (>= 3.1.0)
-LinkingTo: BH (>= 1.65.0), Boom(>= 0.9)
+Depends: Boom (>= 0.9.1) , R (>= 3.1.0)
+LinkingTo: BH (>= 1.65.0), Boom(>= 0.9.1)
 Suggests: MASS, testthat, mlbench
 Imports: igraph
-Version: 1.1.0
+Version: 1.1.1
 License: LGPL-2.1 | file LICENSE
 Encoding: UTF-8
 NeedsCompilation: yes
-Packaged: 2019-05-17 22:08:02 UTC; stevescott
+Packaged: 2019-06-06 18:43:27 UTC; stevescott
 Repository: CRAN
-Date/Publication: 2019-05-18 07:30:03 UTC
+Date/Publication: 2019-06-07 15:20:03 UTC
