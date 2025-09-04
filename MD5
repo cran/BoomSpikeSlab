@@ -1,4 +1,4 @@
-056379ce1282eb6720a48c3b727f5f13 *DESCRIPTION
+96ba77ef6ca32e7e9fbdbb944d36a1e9 *DESCRIPTION
 f9eb64a4b821ad6ad5dfc9239511b9cd *LICENSE
 ea2fe0dda00e7720eb547321e9413511 *NAMESPACE
 017cf4e379609bb6b72ac1b17854c67f *R/lm.spike.R
@@ -50,7 +50,7 @@ c1d87acce9777fe70346b48489fcb899 *man/mlm.spike.slab.prior.Rd
 4b4eacb1615e95659c3098b2226054d3 *man/model.matrix.Rd
 0e6731f34157eac3110d1da01e2705ff *man/model.matrix.glm.spike.Rd
 776f7f2e33ffa4fb2baf7774d8db749e *man/nested.regression.Rd
-23796dc40cbcc5d58c272194b1fec260 *man/nnet.Rd
+738f5d69662eb8c23add28310076c13b *man/nnet.Rd
 e15868879450402e6a0a2a02225faaa3 *man/partial.dependence.plot.Rd
 24ef7b02184c714055d6bd40871e644b *man/plot.BayesNnet.Rd
 1d23c0026fd50465bf7917b2a8879611 *man/plot.coefficients.Rd
@@ -77,7 +77,7 @@ d3fd2f03301f85715f949e4147789ebb *man/spike.slab.glm.prior.Rd
 6c1fe8235c61e5e835c83929caa01255 *man/spike.slab.prior.base.Rd
 5557eacae2949676307f686bf8ba1681 *man/splines.Rd
 51cac8a9756d92caf855f67d2c15c8a0 *man/student.spike.slab.prior.Rd
-a69ea1006891d35da358244b390f0b54 *man/suggest.burn.Rd
+e8cf7568b26ba100627d2999c63e7f49 *man/suggest.burn.Rd
 5340a4a44eda6801ab3f72a6bf199e17 *man/summarize_spike_slab_coefficients.Rd
 15238ab84f1bf58a84081881139f74a0 *man/summary.lm.spike.Rd
 15744505846f4619328da598db42aca0 *man/summary.logit.spike.Rd
